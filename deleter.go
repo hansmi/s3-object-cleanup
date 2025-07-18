@@ -51,7 +51,7 @@ func (d *batchDeleter) deleteBatch(ctx context.Context, logger *slog.Logger, ite
 		d.stats.addDelete(i)
 	}
 
-	if !d.dryRun && false {
+	if !d.dryRun {
 		output, err := d.client.DeleteObjects(ctx, input)
 		if err != nil {
 			return err
