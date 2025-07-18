@@ -1,4 +1,8 @@
+FROM docker.io/library/alpine:latest AS alpine
+
 FROM scratch
+
+COPY --from=alpine /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
 LABEL org.opencontainers.image.licenses=BSD-3-Clause
 LABEL org.opencontainers.image.description="Remove non-current object versions from S3 buckets"
