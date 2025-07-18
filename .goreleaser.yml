@@ -1,0 +1,104 @@
+# Configuration for GoReleaser
+# https://goreleaser.com/
+
+version: 2
+
+project_name: s3-object-cleanup
+
+builds:
+  - main: .
+    binary: s3-object-cleanup
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    goamd64:
+      - v2
+    flags:
+      - -trimpath
+
+nfpms:
+  - description: Remove non-current object versions from S3 buckets
+    maintainer: M. Hanselmann
+    bindir: /usr/bin
+    license: BSD-3-Clause
+    formats:
+      - deb
+      - rpm
+    contents:
+      - src: ./README.md
+        dst: /usr/share/doc/s3-object-cleanup/README.md
+      - src: ./LICENSE
+        dst: /usr/share/doc/s3-object-cleanup/LICENSE
+
+archives:
+  - formats:
+      - tar.gz
+    wrap_in_directory: true
+    files:
+      - LICENSE
+      - README.md
+
+dockers:
+  - use: buildx
+    goos: linux
+    goarch: amd64
+    goamd64: v2
+    dockerfile: contrib/Dockerfile.goreleaser
+    extra_files: &docker_extra_files
+      - LICENSE
+      - README.md
+    image_templates:
+      - ghcr.io/hansmi/s3-object-cleanup:{{.Tag}}-amd64
+    build_flag_templates:
+      - --pull
+      - --platform=linux/amd64
+      - --label=org.opencontainers.image.created={{.Date}}
+      - --label=org.opencontainers.image.name={{.ProjectName}}
+      - --label=org.opencontainers.image.revision={{.FullCommit}}
+      - --label=org.opencontainers.image.version={{.Version}}
+      - --label=org.opencontainers.image.source={{.GitURL}}
+  - use: buildx
+    goos: linux
+    goarch: arm64
+    dockerfile: contrib/Dockerfile.goreleaser
+    extra_files: *docker_extra_files
+    image_templates:
+      - ghcr.io/hansmi/s3-object-cleanup:{{.Tag}}-arm64
+    build_flag_templates:
+      - --pull
+      - --platform=linux/arm64
+      - --label=org.opencontainers.image.created={{.Date}}
+      - --label=org.opencontainers.image.name={{.ProjectName}}
+      - --label=org.opencontainers.image.revision={{.FullCommit}}
+      - --label=org.opencontainers.image.version={{.Version}}
+      - --label=org.opencontainers.image.source={{.GitURL}}
+
+docker_manifests:
+  - name_template: ghcr.io/hansmi/s3-object-cleanup:{{.Tag}}
+    image_templates: &docker_manifest_image_templates
+      - ghcr.io/hansmi/s3-object-cleanup:{{.Tag}}-amd64
+      - ghcr.io/hansmi/s3-object-cleanup:{{.Tag}}-arm64
+  - name_template: ghcr.io/hansmi/s3-object-cleanup:v{{.Major}}
+    image_templates: *docker_manifest_image_templates
+  - name_template: ghcr.io/hansmi/s3-object-cleanup:latest
+    image_templates: *docker_manifest_image_templates
+
+changelog:
+  groups:
+    - title: Dependencies
+      regexp: '(?i)^(?:[a-f0-9]{8,64}\s+)?Bump\s+[-.\w]+/\w.*\sto\s'
+      order: 1
+    - order: 0
+
+release:
+  draft: true
+  prerelease: auto
+
+snapshot:
+  version_template: '{{ incpatch .Version }}-snapshot{{ replace (replace .Date ":" "") "-" "" }}+g{{ .ShortCommit }}'
+
+# vim: set sw=2 sts=2 et :
