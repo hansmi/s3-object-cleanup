@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net/url"
 	"os"
 	"strings"
@@ -66,6 +67,11 @@ func newBucketFromName(cfg aws.Config, input string) (*bucket, error) {
 }
 
 func (b *bucket) listObjectVersions(ctx context.Context, handler versionHandler) error {
+	slog.InfoContext(ctx, "Listing object versions",
+		slog.String("bucket", b.name),
+		slog.String("prefix", b.prefix),
+	)
+
 	paginator := s3.NewListObjectVersionsPaginator(b.client, &s3.ListObjectVersionsInput{
 		Bucket: aws.String(b.name),
 		Prefix: aws.String(b.prefix),
