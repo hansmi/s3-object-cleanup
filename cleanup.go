@@ -34,7 +34,7 @@ func (t *objectVersionHandler) append(v objectVersion) {
 	t.versions = slices.Insert(t.versions, pos, v)
 }
 
-func (t *objectVersionHandler) selectOld(modifiedBefore time.Time) []objectVersion {
+func (t *objectVersionHandler) popOldVersions(modifiedBefore time.Time) []objectVersion {
 	// Avoid deleting unless the latest version is known.
 	if latestKnown := slices.ContainsFunc(t.versions, func(v objectVersion) bool {
 		return v.isLatest
@@ -113,7 +113,7 @@ func (h *cleanupHandler) handle(v objectVersion) {
 
 	oh.append(v)
 
-	for _, i := range oh.selectOld(h.modifiedBefore) {
+	for _, i := range oh.popOldVersions(h.modifiedBefore) {
 		h.ch <- i
 	}
 }

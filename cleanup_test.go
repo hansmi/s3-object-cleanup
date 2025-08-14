@@ -55,7 +55,7 @@ func TestObjectVersionHandlerAppend(t *testing.T) {
 	}
 }
 
-func TestObjectVersionHandlerSelectOld(t *testing.T) {
+func TestObjectVersionHandlerPopOldVersions(t *testing.T) {
 	for _, tc := range []struct {
 		name           string
 		objects        []objectVersion
@@ -191,7 +191,7 @@ func TestObjectVersionHandlerSelectOld(t *testing.T) {
 
 			var got []string
 
-			for _, i := range h.selectOld(tc.modifiedBefore) {
+			for _, i := range h.popOldVersions(tc.modifiedBefore) {
 				got = append(got, i.versionID)
 			}
 
