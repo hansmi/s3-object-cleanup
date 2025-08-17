@@ -80,18 +80,18 @@ func (t *objectVersionTracker) popOldVersions(modifiedBefore time.Time) []object
 }
 
 type cleanupHandler struct {
-	stats *cleanupStats
-	ch    chan<- objectVersion
+	stats    *cleanupStats
+	deleteCh chan<- objectVersion
 
 	modifiedBefore time.Time
 
 	objects map[string]*objectVersionTracker
 }
 
-func newCleanupHandler(stats *cleanupStats, ch chan<- objectVersion, modifiedBefore time.Time) *cleanupHandler {
+func newCleanupHandler(stats *cleanupStats, deleteCh chan<- objectVersion, modifiedBefore time.Time) *cleanupHandler {
 	return &cleanupHandler{
-		stats: stats,
-		ch:    ch,
+		stats:    stats,
+		deleteCh: deleteCh,
 
 		modifiedBefore: modifiedBefore,
 
@@ -115,7 +115,7 @@ func (h *cleanupHandler) handle(v objectVersion) {
 	t.append(v)
 
 	for _, i := range t.popOldVersions(h.modifiedBefore) {
-		h.ch <- i
+		h.deleteCh <- i
 	}
 }
 
@@ -154,19 +154,19 @@ type cleanupOptions struct {
 }
 
 func cleanup(ctx context.Context, opts cleanupOptions) error {
-	ch := make(chan objectVersion, 8)
+	deleteCh := make(chan objectVersion, 8)
 
 	g, ctx := errgroup.WithContext(ctx)
 	g.Go(func() error {
 		deleter := newBatchDeleter(opts.logger, opts.stats, opts.bucket, opts.dryRun)
 
-		return deleter.run(ctx, ch)
+		return deleter.run(ctx, deleteCh)
 	})
 	g.Go(func() error {
-		defer close(ch)
+		defer close(deleteCh)
 
 		return opts.bucket.listObjectVersions(ctx, opts.logger,
-			newCleanupHandler(opts.stats, ch, opts.modifiedBefore))
+			newCleanupHandler(opts.stats, deleteCh, opts.modifiedBefore))
 	})
 
 	return g.Wait()
