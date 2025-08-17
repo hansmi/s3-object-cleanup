@@ -116,7 +116,14 @@ func (p *program) run(ctx context.Context, bucketNames []string) (err error) {
 	for _, b := range buckets {
 		logger := slog.With(slog.String("bucket", b.name))
 
-		if err := cleanup(ctx, logger, stats, s, b, p.dryRun, modifiedBefore); err != nil {
+		if err := cleanup(ctx, cleanupOptions{
+			logger:         logger,
+			stats:          stats,
+			state:          s,
+			bucket:         b,
+			dryRun:         p.dryRun,
+			modifiedBefore: modifiedBefore,
+		}); err != nil {
 			logger.Error("Cleanup failed", slog.Any("error", err))
 
 			bucketErrors = append(bucketErrors, fmt.Errorf("%s: %w", b.name, err))

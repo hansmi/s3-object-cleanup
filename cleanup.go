@@ -144,19 +144,29 @@ func (h *cleanupHandler) handleDeleteMarker(marker types.DeleteMarkerEntry) erro
 	return nil
 }
 
-func cleanup(ctx context.Context, logger *slog.Logger, s *cleanupStats, state *state.Store, b *bucket, dryRun bool, modifiedBefore time.Time) error {
+type cleanupOptions struct {
+	logger         *slog.Logger
+	stats          *cleanupStats
+	state          *state.Store
+	bucket         *bucket
+	dryRun         bool
+	modifiedBefore time.Time
+}
+
+func cleanup(ctx context.Context, opts cleanupOptions) error {
 	ch := make(chan objectVersion, 8)
 
 	g, ctx := errgroup.WithContext(ctx)
 	g.Go(func() error {
-		deleter := newBatchDeleter(logger, s, b, dryRun)
+		deleter := newBatchDeleter(opts.logger, opts.stats, opts.bucket, opts.dryRun)
 
 		return deleter.run(ctx, ch)
 	})
 	g.Go(func() error {
 		defer close(ch)
 
-		return b.listObjectVersions(ctx, logger, newCleanupHandler(s, ch, modifiedBefore))
+		return opts.bucket.listObjectVersions(ctx, opts.logger,
+			newCleanupHandler(opts.stats, ch, opts.modifiedBefore))
 	})
 
 	return g.Wait()
