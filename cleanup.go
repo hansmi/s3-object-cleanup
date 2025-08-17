@@ -13,12 +13,12 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-type objectVersionHandler struct {
+type objectVersionTracker struct {
 	key      string
 	versions []objectVersion
 }
 
-func (t *objectVersionHandler) append(v objectVersion) {
+func (t *objectVersionTracker) append(v objectVersion) {
 	if len(t.versions) == 0 {
 		t.versions = append(t.versions, v)
 		return
@@ -35,7 +35,7 @@ func (t *objectVersionHandler) append(v objectVersion) {
 	t.versions = slices.Insert(t.versions, pos, v)
 }
 
-func (t *objectVersionHandler) popOldVersions(modifiedBefore time.Time) []objectVersion {
+func (t *objectVersionTracker) popOldVersions(modifiedBefore time.Time) []objectVersion {
 	// Avoid deleting unless the latest version is known.
 	if latestKnown := slices.ContainsFunc(t.versions, func(v objectVersion) bool {
 		return v.isLatest
@@ -85,7 +85,7 @@ type cleanupHandler struct {
 
 	modifiedBefore time.Time
 
-	objects map[string]*objectVersionHandler
+	objects map[string]*objectVersionTracker
 }
 
 func newCleanupHandler(stats *cleanupStats, ch chan<- objectVersion, modifiedBefore time.Time) *cleanupHandler {
@@ -95,26 +95,26 @@ func newCleanupHandler(stats *cleanupStats, ch chan<- objectVersion, modifiedBef
 
 		modifiedBefore: modifiedBefore,
 
-		objects: map[string]*objectVersionHandler{},
+		objects: map[string]*objectVersionTracker{},
 	}
 }
 
 func (h *cleanupHandler) handle(v objectVersion) {
 	h.stats.discovered(v)
 
-	oh := h.objects[v.key]
+	t := h.objects[v.key]
 
-	if oh == nil {
-		oh = &objectVersionHandler{
+	if t == nil {
+		t = &objectVersionTracker{
 			key: v.key,
 		}
 
-		h.objects[v.key] = oh
+		h.objects[v.key] = t
 	}
 
-	oh.append(v)
+	t.append(v)
 
-	for _, i := range oh.popOldVersions(h.modifiedBefore) {
+	for _, i := range t.popOldVersions(h.modifiedBefore) {
 		h.ch <- i
 	}
 }
