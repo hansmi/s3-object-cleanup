@@ -29,8 +29,10 @@ func TestWriteTo(t *testing.T) {
 
 	var buf bytes.Buffer
 
-	if err := s.WriteTo(&buf); err != nil {
+	if n, err := s.WriteTo(&buf); err != nil {
 		t.Errorf("WriteTo() failed: %v", err)
+	} else if int64(buf.Len()) != n {
+		t.Errorf("WriteTo() wrote %d bytes, want %d", buf.Len(), n)
 	}
 
 	if got, want := buf.Len(), 4*1024; got < want {

@@ -42,10 +42,15 @@ func (s *Store) Close() error {
 }
 
 // WriteTo writes the entire database to a writer.
-func (s *Store) WriteTo(w io.Writer) error {
-	return s.db.Bolt().View(func(tx *bolt.Tx) error {
-		_, err := tx.WriteTo(w)
+func (s *Store) WriteTo(w io.Writer) (int64, error) {
+	var n int64
+	var err error
+
+	err = s.db.Bolt().View(func(tx *bolt.Tx) error {
+		n, err = tx.WriteTo(w)
 
 		return err
 	})
+
+	return n, err
 }

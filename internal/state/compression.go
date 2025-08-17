@@ -32,7 +32,7 @@ func (s *Store) WriteCompressed(tmpdir string) (io.ReadCloser, error) {
 
 	zw := gzip.NewWriter(tmpfile)
 
-	if err := s.WriteTo(zw); err != nil {
+	if _, err := s.WriteTo(zw); err != nil {
 		return nil, errors.Join(fmt.Errorf("database snapshot: %w", err), tmpfile.Close())
 	}
 
