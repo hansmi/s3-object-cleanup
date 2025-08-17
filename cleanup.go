@@ -9,6 +9,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/hansmi/s3-object-cleanup/internal/state"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -143,7 +144,7 @@ func (h *cleanupHandler) handleDeleteMarker(marker types.DeleteMarkerEntry) erro
 	return nil
 }
 
-func cleanup(ctx context.Context, s *cleanupStats, b *bucket, dryRun bool, modifiedBefore time.Time) error {
+func cleanup(ctx context.Context, s *cleanupStats, state *state.Store, b *bucket, dryRun bool, modifiedBefore time.Time) error {
 	ch := make(chan objectVersion, 8)
 
 	g, ctx := errgroup.WithContext(ctx)

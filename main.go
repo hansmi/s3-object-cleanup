@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -13,6 +14,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/smithy-go/logging"
+	"github.com/hansmi/s3-object-cleanup/internal/state"
 )
 
 const minAgeDaysDefault = 32
@@ -20,6 +22,8 @@ const minAgeDaysDefault = 32
 type program struct {
 	dryRun bool
 	minAge time.Duration
+
+	persistenceBucket string
 }
 
 func (p *program) registerFlags() {
@@ -31,9 +35,13 @@ func (p *program) registerFlags() {
 		mustGetenvDuration("S3_OBJECT_CLEANUP_MIN_AGE", minAgeDaysDefault*24*time.Hour),
 		fmt.Sprintf("Minimum object version age. Defaults to $S3_OBJECT_CLEANUP_MIN_AGE or %d days.",
 			minAgeDaysDefault))
+
+	flag.StringVar(&p.persistenceBucket, "persistence_bucket",
+		getenvWithFallback("S3_OBJECT_CLEANUP_PERSISTENCE_BUCKET", ""),
+		`URL to an S3 bucket for storing a information reducing API calls. Defaults to $S3_OBJECT_CLEANUP_PERSISTENCE_BUCKET.`)
 }
 
-func (p *program) run(ctx context.Context, bucketNames []string) error {
+func (p *program) run(ctx context.Context, bucketNames []string) (err error) {
 	cfg, err := config.LoadDefaultConfig(ctx,
 		config.WithLogger(logging.StandardLogger{
 			Logger: slog.NewLogLogger(slog.Default().Handler(), slog.LevelDebug),
@@ -58,17 +66,58 @@ func (p *program) run(ctx context.Context, bucketNames []string) error {
 		buckets = append(buckets, b)
 	}
 
-	s := newCleanupStats()
+	tmpdir, err := os.MkdirTemp("", "")
+	if err != nil {
+		return err
+	}
 
 	defer func() {
-		slog.InfoContext(ctx, "Statistics", s.attrs()...)
+		err = errors.Join(err, os.RemoveAll(tmpdir))
+	}()
+
+	var s *state.Store
+	var persistState func(context.Context) error
+
+	if p.persistenceBucket != "" {
+		const key = "state.gz"
+
+		b, err := newBucketFromName(cfg, p.persistenceBucket)
+		if err != nil {
+			return err
+		}
+
+		if s, err = downloadStateFromBucket(ctx, tmpdir, b, key); err != nil {
+			slog.Warn("Restoring state failed", slog.Any("error", err))
+			s = nil
+		}
+
+		persistState = func(ctx context.Context) error {
+			return uploadStateToBucket(ctx, s, tmpdir, b, key)
+		}
+	}
+
+	if s == nil {
+		s, err = state.New(tmpdir)
+		if err != nil {
+			return fmt.Errorf("initializing state: %w", err)
+		}
+	}
+
+	stats := newCleanupStats()
+
+	defer func() {
+		slog.InfoContext(ctx, "Statistics", stats.attrs()...)
 	}()
 
 	modifiedBefore := time.Now().Add(-p.minAge).Truncate(time.Minute)
 
 	for _, b := range buckets {
-		if err := cleanup(ctx, s, b, p.dryRun, modifiedBefore); err != nil {
+		if err := cleanup(ctx, stats, s, b, p.dryRun, modifiedBefore); err != nil {
 			return fmt.Errorf("%s: %w", b.name, err)
+		}
+
+		if err := persistState(ctx); err != nil {
+			return fmt.Errorf("persisting state: %w", err)
 		}
 	}
 

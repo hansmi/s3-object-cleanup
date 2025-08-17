@@ -10,6 +10,8 @@ require (
 	github.com/aws/smithy-go v1.22.5
 	github.com/dustin/go-humanize v1.0.1
 	github.com/google/go-cmp v0.7.0
+	github.com/timshannon/bolthold v0.0.0-20240314194003-30aac6950928
+	go.etcd.io/bbolt v1.4.2
 	golang.org/x/sync v0.16.0
 )
 
@@ -28,4 +30,5 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sso v1.28.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.33.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sts v1.37.0 // indirect
+	golang.org/x/sys v0.29.0 // indirect
 )
