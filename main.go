@@ -111,17 +111,23 @@ func (p *program) run(ctx context.Context, bucketNames []string) (err error) {
 
 	modifiedBefore := time.Now().Add(-p.minAge).Truncate(time.Minute)
 
-	for _, b := range buckets {
-		if err := cleanup(ctx, stats, s, b, p.dryRun, modifiedBefore); err != nil {
-			return fmt.Errorf("%s: %w", b.name, err)
-		}
+	var bucketErrors []error
 
-		if err := persistState(ctx); err != nil {
-			return fmt.Errorf("persisting state: %w", err)
+	for _, b := range buckets {
+		logger := slog.With(slog.String("bucket", b.name))
+
+		if err := cleanup(ctx, logger, stats, s, b, p.dryRun, modifiedBefore); err != nil {
+			logger.Error("Cleanup failed", slog.Any("error", err))
+
+			bucketErrors = append(bucketErrors, fmt.Errorf("%s: %w", b.name, err))
 		}
 	}
 
-	return nil
+	if err := persistState(ctx); err != nil {
+		return fmt.Errorf("persisting state: %w", err)
+	}
+
+	return errors.Join(bucketErrors...)
 }
 
 func main() {

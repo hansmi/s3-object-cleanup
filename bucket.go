@@ -69,9 +69,8 @@ func newBucketFromName(cfg aws.Config, input string) (*bucket, error) {
 	return result, nil
 }
 
-func (b *bucket) listObjectVersions(ctx context.Context, handler versionHandler) error {
-	slog.InfoContext(ctx, "Listing object versions",
-		slog.String("bucket", b.name),
+func (b *bucket) listObjectVersions(ctx context.Context, logger *slog.Logger, handler versionHandler) error {
+	logger.InfoContext(ctx, "Listing object versions",
 		slog.String("prefix", b.prefix),
 	)
 
