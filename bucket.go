@@ -3,12 +3,15 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/url"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
@@ -97,4 +100,32 @@ func (b *bucket) listObjectVersions(ctx context.Context, handler versionHandler)
 	}
 
 	return nil
+}
+
+func (b *bucket) downloadObject(ctx context.Context, w io.WriterAt, key string) error {
+	downloader := manager.NewDownloader(b.client)
+
+	_, err := downloader.Download(ctx, w, &s3.GetObjectInput{
+		Bucket: aws.String(b.name),
+		Key:    aws.String(key),
+	})
+
+	return err
+}
+
+func (b *bucket) uploadObject(ctx context.Context, r io.Reader, key string) error {
+	uploader := manager.NewUploader(b.client)
+
+	if _, err := uploader.Upload(ctx, &s3.PutObjectInput{
+		Bucket: aws.String(b.name),
+		Key:    aws.String(key),
+		Body:   r,
+	}); err != nil {
+		return err
+	}
+
+	return s3.NewObjectExistsWaiter(b.client).Wait(ctx, &s3.HeadObjectInput{
+		Bucket: aws.String(b.name),
+		Key:    aws.String(key),
+	}, time.Minute)
 }
