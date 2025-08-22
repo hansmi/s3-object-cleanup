@@ -43,6 +43,10 @@ func Open(path string) (*Store, error) {
 		return nil, fmt.Errorf("opening state %q: %w", path, err)
 	}
 
+	if err := db.ReIndex(&objectRetentionRecord{}, nil); err != nil {
+		return nil, fmt.Errorf("store indexing: %w", err)
+	}
+
 	return &Store{
 		db: db,
 	}, nil
