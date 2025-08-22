@@ -99,7 +99,7 @@ func newCleanupHandler(stats *cleanupStats, deleteCh chan<- objectVersion, modif
 	}
 }
 
-func (h *cleanupHandler) handle(v objectVersion) {
+func (h *cleanupHandler) handle(v objectVersion) error {
 	h.stats.discovered(v)
 
 	t := h.objects[v.key]
@@ -117,31 +117,32 @@ func (h *cleanupHandler) handle(v objectVersion) {
 	for _, i := range t.popOldVersions(h.modifiedBefore) {
 		h.deleteCh <- i
 	}
+
+	return nil
 }
 
-func (h *cleanupHandler) handleVersion(ov types.ObjectVersion) error {
-	h.handle(objectVersion{
+type listHandler struct {
+	c *cleanupHandler
+}
+
+func (h *listHandler) handleVersion(ov types.ObjectVersion) error {
+	return h.c.handle(objectVersion{
 		key:          aws.ToString(ov.Key),
 		versionID:    aws.ToString(ov.VersionId),
 		lastModified: aws.ToTime(ov.LastModified),
 		isLatest:     aws.ToBool(ov.IsLatest),
 		size:         aws.ToInt64(ov.Size),
 	})
-
-	return nil
 }
 
-func (h *cleanupHandler) handleDeleteMarker(marker types.DeleteMarkerEntry) error {
-	h.handle(objectVersion{
+func (h *listHandler) handleDeleteMarker(marker types.DeleteMarkerEntry) error {
+	return h.c.handle(objectVersion{
 		key:          aws.ToString(marker.Key),
 		versionID:    aws.ToString(marker.VersionId),
 		lastModified: aws.ToTime(marker.LastModified),
 		isLatest:     aws.ToBool(marker.IsLatest),
 		deleteMarker: true,
-		size:         0,
 	})
-
-	return nil
 }
 
 type cleanupOptions struct {
@@ -165,8 +166,10 @@ func cleanup(ctx context.Context, opts cleanupOptions) error {
 	g.Go(func() error {
 		defer close(deleteCh)
 
-		return opts.bucket.listObjectVersions(ctx, opts.logger,
-			newCleanupHandler(opts.stats, deleteCh, opts.modifiedBefore))
+		return opts.bucket.listObjectVersions(ctx, opts.logger, &listHandler{
+			c: newCleanupHandler(opts.stats, deleteCh, opts.modifiedBefore),
+		})
+
 	})
 
 	return g.Wait()
