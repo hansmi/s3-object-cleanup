@@ -15,6 +15,7 @@ type objectVersion struct {
 	isLatest     bool
 	deleteMarker bool
 	size         int64
+	retainUntil  time.Time
 }
 
 var _ slog.LogValuer = (*objectVersion)(nil)
@@ -25,6 +26,7 @@ func (v objectVersion) LogValue() slog.Value {
 		slog.String("version", v.versionID),
 		slog.Time("last_modified", v.lastModified),
 		slog.Bool("delete_marker", v.deleteMarker),
+		slog.Time("retain_until", v.retainUntil),
 	)
 }
 
