@@ -29,7 +29,7 @@ type program struct {
 func (p *program) registerFlags() {
 	flag.BoolVar(&p.dryRun, "dry_run",
 		mustGetenvBool("S3_OBJECT_CLEANUP_DRY_RUN", true),
-		"Delete objects instead of only checking what would be done. Defaults to $S3_OBJECT_CLEANUP_DRY_RUN.")
+		"Perform a trial run without actually deleting objects. Defaults to $S3_OBJECT_CLEANUP_DRY_RUN.")
 
 	flag.DurationVar(&p.minAge, "min_age",
 		mustGetenvDuration("S3_OBJECT_CLEANUP_MIN_AGE", minAgeDaysDefault*24*time.Hour),
