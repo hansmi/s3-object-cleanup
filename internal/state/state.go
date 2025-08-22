@@ -1,6 +1,7 @@
 package state
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -27,7 +28,17 @@ func New(tmpdir string) (*Store, error) {
 }
 
 func Open(path string) (*Store, error) {
-	db, err := bolthold.Open(path, 0o600, nil)
+	var opts bolthold.Options
+
+	opts.Encoder = json.Marshal
+	opts.Decoder = json.Unmarshal
+
+	opts.Options = &bolt.Options{
+		// Data is ephemeral anyway
+		NoSync: true,
+	}
+
+	db, err := bolthold.Open(path, 0o600, &opts)
 	if err != nil {
 		return nil, fmt.Errorf("opening state %q: %w", path, err)
 	}
