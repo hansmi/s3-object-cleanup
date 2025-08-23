@@ -25,6 +25,14 @@ type versionHandler interface {
 	handleVersion(types.ObjectVersion) error
 }
 
+func annotateError(err *error, format string, args ...any) {
+	prefix := fmt.Sprintf(format, args...)
+
+	if *err != nil {
+		*err = fmt.Errorf("%s: %w", prefix, *err)
+	}
+}
+
 type client struct {
 	client *s3.Client
 	name   string
@@ -105,10 +113,12 @@ func (c *client) listObjectVersions(ctx context.Context, logger *slog.Logger, ha
 	return nil
 }
 
-func (c *client) downloadObject(ctx context.Context, w io.WriterAt, key string) error {
+func (c *client) downloadObject(ctx context.Context, w io.WriterAt, key string) (err error) {
+	defer annotateError(&err, "key %q", key)
+
 	downloader := manager.NewDownloader(c.client)
 
-	_, err := downloader.Download(ctx, w, &s3.GetObjectInput{
+	_, err = downloader.Download(ctx, w, &s3.GetObjectInput{
 		Bucket: aws.String(c.name),
 		Key:    aws.String(key),
 	})
@@ -116,7 +126,9 @@ func (c *client) downloadObject(ctx context.Context, w io.WriterAt, key string) 
 	return err
 }
 
-func (c *client) uploadObject(ctx context.Context, r io.Reader, key string) error {
+func (c *client) uploadObject(ctx context.Context, r io.Reader, key string) (err error) {
+	defer annotateError(&err, "key %q", key)
+
 	uploader := manager.NewUploader(c.client)
 
 	if _, err := uploader.Upload(ctx, &s3.PutObjectInput{
@@ -138,6 +150,8 @@ type getObjectRetentionClient interface {
 }
 
 func getObjectRetentionImpl(ctx context.Context, c getObjectRetentionClient, bucket, key, versionID string) (_ time.Time, err error) {
+	defer annotateError(&err, "key %q, version %q", key, versionID)
+
 	result, err := c.GetObjectRetention(ctx, &s3.GetObjectRetentionInput{
 		Bucket:    aws.String(bucket),
 		Key:       aws.String(key),
