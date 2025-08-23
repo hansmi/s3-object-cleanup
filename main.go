@@ -131,7 +131,7 @@ func (p *program) run(ctx context.Context, bucketNames []string) (err error) {
 	}
 
 	if err := persistState(ctx); err != nil {
-		return fmt.Errorf("persisting state: %w", err)
+		bucketErrors = append(bucketErrors, fmt.Errorf("persisting state: %w", err))
 	}
 
 	return errors.Join(bucketErrors...)
