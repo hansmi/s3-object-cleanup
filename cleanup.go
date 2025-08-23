@@ -3,6 +3,7 @@ package main
 import (
 	"cmp"
 	"context"
+	"fmt"
 	"log/slog"
 	"slices"
 	"time"
@@ -122,27 +123,31 @@ func (h *cleanupHandler) handle(v objectVersion) error {
 }
 
 type listHandler struct {
-	c *cleanupHandler
+	ch chan<- objectVersion
 }
 
 func (h *listHandler) handleVersion(ov types.ObjectVersion) error {
-	return h.c.handle(objectVersion{
+	h.ch <- objectVersion{
 		key:          aws.ToString(ov.Key),
 		versionID:    aws.ToString(ov.VersionId),
 		lastModified: aws.ToTime(ov.LastModified),
 		isLatest:     aws.ToBool(ov.IsLatest),
 		size:         aws.ToInt64(ov.Size),
-	})
+	}
+
+	return nil
 }
 
 func (h *listHandler) handleDeleteMarker(marker types.DeleteMarkerEntry) error {
-	return h.c.handle(objectVersion{
+	h.ch <- objectVersion{
 		key:          aws.ToString(marker.Key),
 		versionID:    aws.ToString(marker.VersionId),
 		lastModified: aws.ToTime(marker.LastModified),
 		isLatest:     aws.ToBool(marker.IsLatest),
 		deleteMarker: true,
-	})
+	}
+
+	return nil
 }
 
 type cleanupOptions struct {
@@ -155,21 +160,55 @@ type cleanupOptions struct {
 }
 
 func cleanup(ctx context.Context, opts cleanupOptions) error {
+	bucketState, err := opts.state.Bucket(opts.client.name)
+	if err != nil {
+		return fmt.Errorf("bucket state: %w", err)
+	}
+
+	annotateCh := make(chan objectVersion, 8)
+	handleCh := make(chan objectVersion, 8)
 	deleteCh := make(chan objectVersion, 8)
 
 	g, ctx := errgroup.WithContext(ctx)
 	g.Go(func() error {
-		deleter := newBatchDeleter(opts.logger, opts.stats, opts.client, opts.dryRun)
+		defer close(annotateCh)
 
-		return deleter.run(ctx, deleteCh)
+		return opts.client.listObjectVersions(ctx, opts.logger, &listHandler{
+			ch: annotateCh,
+		})
+	})
+	g.Go(func() error {
+		defer close(handleCh)
+
+		a := newRetentionAnnotator(bucketState, opts.client)
+
+		return a.run(ctx, annotateCh, handleCh)
 	})
 	g.Go(func() error {
 		defer close(deleteCh)
 
-		return opts.client.listObjectVersions(ctx, opts.logger, &listHandler{
-			c: newCleanupHandler(opts.stats, deleteCh, opts.modifiedBefore),
-		})
+		c := newCleanupHandler(opts.stats, deleteCh, opts.modifiedBefore)
 
+		for {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+
+			case ov, ok := <-handleCh:
+				if !ok {
+					return nil
+				}
+
+				if err := c.handle(ov); err != nil {
+					return err
+				}
+			}
+		}
+	})
+	g.Go(func() error {
+		deleter := newBatchDeleter(opts.logger, opts.stats, opts.client, opts.dryRun)
+
+		return deleter.run(ctx, deleteCh)
 	})
 
 	return g.Wait()
