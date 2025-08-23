@@ -22,12 +22,20 @@ func (r *timeRange) update(t time.Time) {
 	}
 }
 
+func (r *timeRange) attrs() []any {
+	return []any{
+		slog.Time("oldest", r.oldest),
+		slog.Time("newest", r.newest),
+	}
+}
+
 type cleanupStats struct {
 	mu sync.Mutex
 
-	totalCount   int64
-	totalBytes   int64
-	totalModTime timeRange
+	totalCount       int64
+	totalBytes       int64
+	totalModTime     timeRange
+	totalRetainUntil timeRange
 
 	deleteCount   int64
 	deleteBytes   int64
@@ -48,6 +56,7 @@ func (s *cleanupStats) discovered(v objectVersion) {
 	s.totalCount++
 	s.totalBytes += v.size
 	s.totalModTime.update(v.lastModified)
+	s.totalRetainUntil.update(v.retainUntil)
 }
 
 func (s *cleanupStats) addDelete(v objectVersion) {
@@ -75,17 +84,16 @@ func (s *cleanupStats) attrs() []any {
 			slog.Int64("count", s.totalCount),
 			slog.Int64("bytes", s.totalBytes),
 			slog.String("bytes_text", humanize.IBytes(uint64(s.totalBytes))),
-			slog.Time("oldest", s.totalModTime.oldest),
-			slog.Time("newest", s.totalModTime.newest),
+			slog.Group("mod_time", s.totalModTime.attrs()...),
+			slog.Group("retain_until", s.totalRetainUntil.attrs()...),
 		),
 		slog.Group("delete",
 			slog.Int64("count", s.deleteCount),
 			slog.Int64("bytes", s.deleteBytes),
 			slog.String("bytes_text", humanize.IBytes(uint64(s.deleteBytes))),
-			slog.Time("oldest", s.deleteModTime.oldest),
-			slog.Time("newest", s.deleteModTime.newest),
-			slog.Int64("success", s.deleteSuccessCount),
-			slog.Int64("error", s.deleteErrorCount),
+			slog.Group("mod_time", s.deleteModTime.attrs()...),
+			slog.Int64("success_count", s.deleteSuccessCount),
+			slog.Int64("error_count", s.deleteErrorCount),
 		),
 	}
 }
