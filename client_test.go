@@ -9,7 +9,7 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 )
 
-func TestNewBucketFromName(t *testing.T) {
+func TestNewClientFromName(t *testing.T) {
 	for _, tc := range []struct {
 		name         string
 		input        string
@@ -50,7 +50,7 @@ func TestNewBucketFromName(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			var cfg aws.Config
 
-			got, err := newBucketFromName(cfg, tc.input)
+			got, err := newClientFromName(cfg, tc.input)
 
 			if diff := cmp.Diff(tc.wantErr, err, cmpopts.EquateErrors()); diff != "" {
 				t.Errorf("Error diff (-want +got):\n%s", diff)

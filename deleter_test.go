@@ -50,9 +50,9 @@ func TestBatchDeleter(t *testing.T) {
 
 			stats := newCleanupStats()
 
-			b, err := newBucketFromName(aws.Config{}, "test")
+			b, err := newClientFromName(aws.Config{}, "test")
 			if err != nil {
-				t.Fatalf("newBucketFromName() failed: %v", err)
+				t.Fatalf("newClientFromName() failed: %v", err)
 			}
 
 			d := newBatchDeleter(logger, stats, b, true)

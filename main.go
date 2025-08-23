@@ -55,15 +55,15 @@ func (p *program) run(ctx context.Context, bucketNames []string) (err error) {
 		return err
 	}
 
-	var buckets []*bucket
+	var clients []*client
 
 	for _, i := range bucketNames {
-		b, err := newBucketFromName(cfg, i)
+		c, err := newClientFromName(cfg, i)
 		if err != nil {
 			return err
 		}
 
-		buckets = append(buckets, b)
+		clients = append(clients, c)
 	}
 
 	tmpdir, err := os.MkdirTemp("", "")
@@ -81,18 +81,18 @@ func (p *program) run(ctx context.Context, bucketNames []string) (err error) {
 	if p.persistenceBucket != "" {
 		const key = "state.gz"
 
-		b, err := newBucketFromName(cfg, p.persistenceBucket)
+		c, err := newClientFromName(cfg, p.persistenceBucket)
 		if err != nil {
 			return err
 		}
 
-		if s, err = downloadStateFromBucket(ctx, tmpdir, b, key); err != nil {
+		if s, err = downloadStateFromBucket(ctx, tmpdir, c, key); err != nil {
 			slog.Warn("Restoring state failed", slog.Any("error", err))
 			s = nil
 		}
 
 		persistState = func(ctx context.Context) error {
-			return uploadStateToBucket(ctx, s, tmpdir, b, key)
+			return uploadStateToBucket(ctx, s, tmpdir, c, key)
 		}
 	}
 
@@ -113,20 +113,20 @@ func (p *program) run(ctx context.Context, bucketNames []string) (err error) {
 
 	var bucketErrors []error
 
-	for _, b := range buckets {
-		logger := slog.With(slog.String("bucket", b.name))
+	for _, c := range clients {
+		logger := slog.With(slog.String("bucket", c.name))
 
 		if err := cleanup(ctx, cleanupOptions{
 			logger:         logger,
 			stats:          stats,
 			state:          s,
-			bucket:         b,
+			client:         c,
 			dryRun:         p.dryRun,
 			modifiedBefore: modifiedBefore,
 		}); err != nil {
 			logger.Error("Cleanup failed", slog.Any("error", err))
 
-			bucketErrors = append(bucketErrors, fmt.Errorf("%s: %w", b.name, err))
+			bucketErrors = append(bucketErrors, fmt.Errorf("%s: %w", c.name, err))
 		}
 	}
 

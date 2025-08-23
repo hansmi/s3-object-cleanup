@@ -149,7 +149,7 @@ type cleanupOptions struct {
 	logger         *slog.Logger
 	stats          *cleanupStats
 	state          *state.Store
-	bucket         *bucket
+	client         *client
 	dryRun         bool
 	modifiedBefore time.Time
 }
@@ -159,14 +159,14 @@ func cleanup(ctx context.Context, opts cleanupOptions) error {
 
 	g, ctx := errgroup.WithContext(ctx)
 	g.Go(func() error {
-		deleter := newBatchDeleter(opts.logger, opts.stats, opts.bucket, opts.dryRun)
+		deleter := newBatchDeleter(opts.logger, opts.stats, opts.client, opts.dryRun)
 
 		return deleter.run(ctx, deleteCh)
 	})
 	g.Go(func() error {
 		defer close(deleteCh)
 
-		return opts.bucket.listObjectVersions(ctx, opts.logger, &listHandler{
+		return opts.client.listObjectVersions(ctx, opts.logger, &listHandler{
 			c: newCleanupHandler(opts.stats, deleteCh, opts.modifiedBefore),
 		})
 

@@ -24,13 +24,13 @@ type batchDeleter struct {
 	bucketName string
 }
 
-func newBatchDeleter(logger *slog.Logger, stats *cleanupStats, b *bucket, dryRun bool) *batchDeleter {
+func newBatchDeleter(logger *slog.Logger, stats *cleanupStats, c *client, dryRun bool) *batchDeleter {
 	return &batchDeleter{
 		logger:     logger,
 		stats:      stats,
 		dryRun:     dryRun,
-		client:     b.client,
-		bucketName: b.name,
+		client:     c.client,
+		bucketName: c.name,
 	}
 }
 

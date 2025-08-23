@@ -25,14 +25,14 @@ type versionHandler interface {
 	handleVersion(types.ObjectVersion) error
 }
 
-type bucket struct {
+type client struct {
 	client *s3.Client
 	name   string
 	prefix string
 }
 
-func newBucketFromName(cfg aws.Config, input string) (*bucket, error) {
-	result := &bucket{
+func newClientFromName(cfg aws.Config, input string) (*client, error) {
+	result := &client{
 		name: input,
 	}
 
@@ -73,14 +73,14 @@ func newBucketFromName(cfg aws.Config, input string) (*bucket, error) {
 	return result, nil
 }
 
-func (b *bucket) listObjectVersions(ctx context.Context, logger *slog.Logger, handler versionHandler) error {
+func (c *client) listObjectVersions(ctx context.Context, logger *slog.Logger, handler versionHandler) error {
 	logger.InfoContext(ctx, "Listing object versions",
-		slog.String("prefix", b.prefix),
+		slog.String("prefix", c.prefix),
 	)
 
-	paginator := s3.NewListObjectVersionsPaginator(b.client, &s3.ListObjectVersionsInput{
-		Bucket: aws.String(b.name),
-		Prefix: aws.String(b.prefix),
+	paginator := s3.NewListObjectVersionsPaginator(c.client, &s3.ListObjectVersionsInput{
+		Bucket: aws.String(c.name),
+		Prefix: aws.String(c.prefix),
 	})
 
 	for paginator.HasMorePages() {
@@ -105,30 +105,30 @@ func (b *bucket) listObjectVersions(ctx context.Context, logger *slog.Logger, ha
 	return nil
 }
 
-func (b *bucket) downloadObject(ctx context.Context, w io.WriterAt, key string) error {
-	downloader := manager.NewDownloader(b.client)
+func (c *client) downloadObject(ctx context.Context, w io.WriterAt, key string) error {
+	downloader := manager.NewDownloader(c.client)
 
 	_, err := downloader.Download(ctx, w, &s3.GetObjectInput{
-		Bucket: aws.String(b.name),
+		Bucket: aws.String(c.name),
 		Key:    aws.String(key),
 	})
 
 	return err
 }
 
-func (b *bucket) uploadObject(ctx context.Context, r io.Reader, key string) error {
-	uploader := manager.NewUploader(b.client)
+func (c *client) uploadObject(ctx context.Context, r io.Reader, key string) error {
+	uploader := manager.NewUploader(c.client)
 
 	if _, err := uploader.Upload(ctx, &s3.PutObjectInput{
-		Bucket: aws.String(b.name),
+		Bucket: aws.String(c.name),
 		Key:    aws.String(key),
 		Body:   r,
 	}); err != nil {
 		return err
 	}
 
-	return s3.NewObjectExistsWaiter(b.client).Wait(ctx, &s3.HeadObjectInput{
-		Bucket: aws.String(b.name),
+	return s3.NewObjectExistsWaiter(c.client).Wait(ctx, &s3.HeadObjectInput{
+		Bucket: aws.String(c.name),
 		Key:    aws.String(key),
 	}, time.Minute)
 }
@@ -160,6 +160,6 @@ func getObjectRetentionImpl(ctx context.Context, c getObjectRetentionClient, buc
 	return aws.ToTime(result.Retention.RetainUntilDate), nil
 }
 
-func (b *bucket) getObjectRetention(ctx context.Context, key, versionID string) (_ time.Time, err error) {
-	return getObjectRetentionImpl(ctx, b.client, b.name, key, versionID)
+func (c *client) getObjectRetention(ctx context.Context, key, versionID string) (_ time.Time, err error) {
+	return getObjectRetentionImpl(ctx, c.client, c.name, key, versionID)
 }
