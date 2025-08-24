@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log/slog"
 	"net/url"
 	"os"
 	"strings"
@@ -79,38 +78,6 @@ func newClientFromName(cfg aws.Config, input string) (*client, error) {
 	result.client = s3.NewFromConfig(cfg, config...)
 
 	return result, nil
-}
-
-func (c *client) listObjectVersions(ctx context.Context, logger *slog.Logger, handler versionHandler) error {
-	logger.InfoContext(ctx, "Listing object versions",
-		slog.String("prefix", c.prefix),
-	)
-
-	paginator := s3.NewListObjectVersionsPaginator(c.client, &s3.ListObjectVersionsInput{
-		Bucket: aws.String(c.name),
-		Prefix: aws.String(c.prefix),
-	})
-
-	for paginator.HasMorePages() {
-		page, err := paginator.NextPage(ctx)
-		if err != nil {
-			return err
-		}
-
-		for _, i := range page.Versions {
-			if err := handler.handleVersion(i); err != nil {
-				return fmt.Errorf("key %q version %q: %w", aws.ToString(i.Key), aws.ToString(i.VersionId), err)
-			}
-		}
-
-		for _, i := range page.DeleteMarkers {
-			if err := handler.handleDeleteMarker(i); err != nil {
-				return fmt.Errorf("key %q version %q: %w", aws.ToString(i.Key), aws.ToString(i.VersionId), err)
-			}
-		}
-	}
-
-	return nil
 }
 
 func (c *client) downloadObject(ctx context.Context, w io.WriterAt, key string) (err error) {

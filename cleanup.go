@@ -8,8 +8,6 @@ import (
 	"slices"
 	"time"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/hansmi/s3-object-cleanup/internal/state"
 	"golang.org/x/sync/errgroup"
 )
@@ -122,34 +120,6 @@ func (h *cleanupHandler) handle(v objectVersion) error {
 	return nil
 }
 
-type listHandler struct {
-	ch chan<- objectVersion
-}
-
-func (h *listHandler) handleVersion(ov types.ObjectVersion) error {
-	h.ch <- objectVersion{
-		key:          aws.ToString(ov.Key),
-		versionID:    aws.ToString(ov.VersionId),
-		lastModified: aws.ToTime(ov.LastModified),
-		isLatest:     aws.ToBool(ov.IsLatest),
-		size:         aws.ToInt64(ov.Size),
-	}
-
-	return nil
-}
-
-func (h *listHandler) handleDeleteMarker(marker types.DeleteMarkerEntry) error {
-	h.ch <- objectVersion{
-		key:          aws.ToString(marker.Key),
-		versionID:    aws.ToString(marker.VersionId),
-		lastModified: aws.ToTime(marker.LastModified),
-		isLatest:     aws.ToBool(marker.IsLatest),
-		deleteMarker: true,
-	}
-
-	return nil
-}
-
 type cleanupOptions struct {
 	logger         *slog.Logger
 	stats          *cleanupStats
@@ -173,9 +143,7 @@ func cleanup(ctx context.Context, opts cleanupOptions) error {
 	g.Go(func() error {
 		defer close(annotateCh)
 
-		return opts.client.listObjectVersions(ctx, opts.logger, &listHandler{
-			ch: annotateCh,
-		})
+		return listObjectVersions(ctx, opts.client.client, opts.client.name, opts.client.prefix, annotateCh)
 	})
 	g.Go(func() error {
 		defer close(handleCh)
