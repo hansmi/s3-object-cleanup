@@ -7,6 +7,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"golang.org/x/sync/errgroup"
 )
 
 type listHandler struct {
@@ -55,25 +56,38 @@ func listObjectVersions(ctx context.Context, c s3.ListObjectVersionsAPIClient, b
 		Prefix: aws.String(prefix),
 	})
 
-	for paginator.HasMorePages() {
-		page, err := paginator.NextPage(ctx)
-		if err != nil {
-			return err
+	ch := make(chan *s3.ListObjectVersionsOutput)
+
+	g, ctx := errgroup.WithContext(ctx)
+	g.Go(func() error {
+		defer close(ch)
+
+		for paginator.HasMorePages() {
+			page, err := paginator.NextPage(ctx)
+			if err != nil {
+				return err
+			}
+
+			ch <- page
 		}
 
-		// Create a new handler per page to clear out string interning
-		// references (they'll still reference the same string if it wasn't
-		// cleaned up).
+		return nil
+	})
+	g.Go(func() error {
 		handler := newListHandler(out)
 
-		for _, i := range page.Versions {
-			handler.handleVersion(i)
+		for page := range ch {
+			for _, i := range page.Versions {
+				handler.handleVersion(i)
+			}
+
+			for _, i := range page.DeleteMarkers {
+				handler.handleDeleteMarker(i)
+			}
 		}
 
-		for _, i := range page.DeleteMarkers {
-			handler.handleDeleteMarker(i)
-		}
-	}
+		return nil
+	})
 
-	return nil
+	return g.Wait()
 }
