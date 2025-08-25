@@ -12,31 +12,37 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-type objectVersionTracker struct {
-	key      string
-	versions []objectVersion
+type versionSeries struct {
+	key   string
+	items []objectVersion
 }
 
-func (t *objectVersionTracker) append(v objectVersion) {
-	if len(t.versions) == 0 {
-		t.versions = append(t.versions, v)
+func newVersionSeries(key string) *versionSeries {
+	return &versionSeries{
+		key: key,
+	}
+}
+
+func (s *versionSeries) add(v objectVersion) {
+	if len(s.items) == 0 {
+		s.items = append(s.items, v)
 		return
 	}
 
-	// Maintain a sorted list of versions.
-	pos, _ := slices.BinarySearchFunc(t.versions, v, func(a, b objectVersion) int {
+	// Maintain a sorted list of items.
+	pos, _ := slices.BinarySearchFunc(s.items, v, func(a, b objectVersion) int {
 		return cmp.Or(
 			a.lastModified.Compare(b.lastModified),
 			cmp.Compare(a.versionID, b.versionID),
 		)
 	})
 
-	t.versions = slices.Insert(t.versions, pos, v)
+	s.items = slices.Insert(s.items, pos, v)
 }
 
-func (t *objectVersionTracker) popOldVersions(modifiedBefore time.Time) []objectVersion {
+func (s *versionSeries) popOldVersions(modifiedBefore time.Time) []objectVersion {
 	// Avoid deleting unless the latest version is known.
-	if latestKnown := slices.ContainsFunc(t.versions, func(v objectVersion) bool {
+	if latestKnown := slices.ContainsFunc(s.items, func(v objectVersion) bool {
 		return v.isLatest
 	}); !latestKnown {
 		return nil
@@ -45,7 +51,7 @@ func (t *objectVersionTracker) popOldVersions(modifiedBefore time.Time) []object
 	end := -1
 
 	// Find most recent version to delete.
-	for idx, i := range t.versions {
+	for idx, i := range s.items {
 		if i.isLatest && !i.deleteMarker {
 			// Ignore latest version and anything newer.
 			break
@@ -56,10 +62,10 @@ func (t *objectVersionTracker) popOldVersions(modifiedBefore time.Time) []object
 			break
 		}
 
-		if (idx+1) < len(t.versions) && !i.deleteMarker {
+		if (idx+1) < len(s.items) && !i.deleteMarker {
 			// Keep last version before deletion until the delete marker
 			// expires.
-			if next := t.versions[idx+1]; next.deleteMarker && next.lastModified.After(modifiedBefore) {
+			if next := s.items[idx+1]; next.deleteMarker && next.lastModified.After(modifiedBefore) {
 				break
 			}
 		}
@@ -70,9 +76,9 @@ func (t *objectVersionTracker) popOldVersions(modifiedBefore time.Time) []object
 	var result []objectVersion
 
 	if end >= 0 {
-		result = slices.Clone(t.versions[:end+1])
+		result = slices.Clone(s.items[:end+1])
 
-		t.versions = slices.Replace(t.versions, 0, end+1)
+		s.items = slices.Replace(s.items, 0, end+1)
 	}
 
 	return result
@@ -91,7 +97,7 @@ func newProcessor(stats *cleanupStats, modifiedBefore time.Time) *processor {
 }
 
 func (p *processor) run(ctx context.Context, in <-chan objectVersion, deleteCh chan<- objectVersion) error {
-	objects := map[string]*objectVersionTracker{}
+	objects := map[string]*versionSeries{}
 
 	for {
 		var ov objectVersion
@@ -109,19 +115,17 @@ func (p *processor) run(ctx context.Context, in <-chan objectVersion, deleteCh c
 
 		p.stats.discovered(ov)
 
-		t := objects[ov.key]
+		s := objects[ov.key]
 
-		if t == nil {
-			t = &objectVersionTracker{
-				key: ov.key,
-			}
+		if s == nil {
+			s = newVersionSeries(ov.key)
 
-			objects[ov.key] = t
+			objects[ov.key] = s
 		}
 
-		t.append(ov)
+		s.add(ov)
 
-		for _, i := range t.popOldVersions(p.modifiedBefore) {
+		for _, i := range s.popOldVersions(p.modifiedBefore) {
 			deleteCh <- i
 		}
 	}

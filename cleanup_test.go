@@ -11,7 +11,7 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 )
 
-func TestObjectVersionTrackerAppend(t *testing.T) {
+func TestVersionSeriesAdd(t *testing.T) {
 	want := []objectVersion{
 		{
 			lastModified: time.Date(2000, time.January, 1, 0, 0, 0, 0, time.UTC),
@@ -43,19 +43,19 @@ func TestObjectVersionTrackerAppend(t *testing.T) {
 
 		rand.Shuffle(len(objects), reflect.Swapper(objects))
 
-		var tr objectVersionTracker
+		s := newVersionSeries(t.Name())
 
 		for _, i := range objects {
-			tr.append(i)
+			s.add(i)
 		}
 
-		if diff := cmp.Diff(want, tr.versions, cmp.AllowUnexported(objectVersion{})); diff != "" {
+		if diff := cmp.Diff(want, s.items, cmp.AllowUnexported(objectVersion{})); diff != "" {
 			t.Errorf("Versions diff (-want +got):\n%s", diff)
 		}
 	}
 }
 
-func TestObjectVersionTrackerPopOldVersions(t *testing.T) {
+func TestVersionSeriesPopOldVersions(t *testing.T) {
 	for _, tc := range []struct {
 		name           string
 		objects        []objectVersion
@@ -183,15 +183,15 @@ func TestObjectVersionTrackerPopOldVersions(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			var tr objectVersionTracker
+			s := newVersionSeries(t.Name())
 
 			for _, i := range tc.objects {
-				tr.append(i)
+				s.add(i)
 			}
 
 			var got []string
 
-			for _, i := range tr.popOldVersions(tc.modifiedBefore) {
+			for _, i := range s.popOldVersions(tc.modifiedBefore) {
 				got = append(got, i.versionID)
 			}
 
