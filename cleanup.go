@@ -78,43 +78,52 @@ func (t *objectVersionTracker) popOldVersions(modifiedBefore time.Time) []object
 	return result
 }
 
-type cleanupHandler struct {
-	stats    *cleanupStats
-	deleteCh chan<- objectVersion
-
+type processor struct {
+	stats          *cleanupStats
 	modifiedBefore time.Time
-
-	objects map[string]*objectVersionTracker
 }
 
-func newCleanupHandler(stats *cleanupStats, deleteCh chan<- objectVersion, modifiedBefore time.Time) *cleanupHandler {
-	return &cleanupHandler{
-		stats:    stats,
-		deleteCh: deleteCh,
-
+func newProcessor(stats *cleanupStats, modifiedBefore time.Time) *processor {
+	return &processor{
+		stats:          stats,
 		modifiedBefore: modifiedBefore,
-
-		objects: map[string]*objectVersionTracker{},
 	}
 }
 
-func (h *cleanupHandler) handle(v objectVersion) error {
-	h.stats.discovered(v)
+func (p *processor) run(ctx context.Context, in <-chan objectVersion, deleteCh chan<- objectVersion) error {
+	objects := map[string]*objectVersionTracker{}
 
-	t := h.objects[v.key]
+	for {
+		var ov objectVersion
+		var ok bool
 
-	if t == nil {
-		t = &objectVersionTracker{
-			key: v.key,
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+
+		case ov, ok = <-in:
+			if !ok {
+				return nil
+			}
 		}
 
-		h.objects[v.key] = t
-	}
+		p.stats.discovered(ov)
 
-	t.append(v)
+		t := objects[ov.key]
 
-	for _, i := range t.popOldVersions(h.modifiedBefore) {
-		h.deleteCh <- i
+		if t == nil {
+			t = &objectVersionTracker{
+				key: ov.key,
+			}
+
+			objects[ov.key] = t
+		}
+
+		t.append(ov)
+
+		for _, i := range t.popOldVersions(p.modifiedBefore) {
+			deleteCh <- i
+		}
 	}
 
 	return nil
@@ -155,23 +164,9 @@ func cleanup(ctx context.Context, opts cleanupOptions) error {
 	g.Go(func() error {
 		defer close(deleteCh)
 
-		c := newCleanupHandler(opts.stats, deleteCh, opts.modifiedBefore)
+		p := newProcessor(opts.stats, opts.modifiedBefore)
 
-		for {
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-
-			case ov, ok := <-handleCh:
-				if !ok {
-					return nil
-				}
-
-				if err := c.handle(ov); err != nil {
-					return err
-				}
-			}
-		}
+		return p.run(ctx, handleCh, deleteCh)
 	})
 	g.Go(func() error {
 		deleter := newBatchDeleter(opts.logger, opts.stats, opts.client, opts.dryRun)
