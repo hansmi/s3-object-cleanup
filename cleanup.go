@@ -12,9 +12,15 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+type versionSeriesResult struct {
+	expired []objectVersion
+	keep    []objectVersion
+}
+
 type versionSeries struct {
-	key   string
-	items []objectVersion
+	key        string
+	haveLatest bool
+	items      []objectVersion
 }
 
 func newVersionSeries(key string) *versionSeries {
@@ -24,6 +30,8 @@ func newVersionSeries(key string) *versionSeries {
 }
 
 func (s *versionSeries) add(v objectVersion) {
+	s.haveLatest = s.haveLatest || v.isLatest
+
 	if len(s.items) == 0 {
 		s.items = append(s.items, v)
 		return
@@ -40,12 +48,11 @@ func (s *versionSeries) add(v objectVersion) {
 	s.items = slices.Insert(s.items, pos, v)
 }
 
-func (s *versionSeries) popOldVersions(modifiedBefore time.Time) []objectVersion {
-	// Avoid deleting unless the latest version is known.
-	if latestKnown := slices.ContainsFunc(s.items, func(v objectVersion) bool {
-		return v.isLatest
-	}); !latestKnown {
-		return nil
+func (s *versionSeries) check(modifiedBefore time.Time) (result versionSeriesResult) {
+	// Avoid making changes unless the latest version is known.
+	if !s.haveLatest {
+		result.keep = s.items
+		return
 	}
 
 	end := -1
@@ -73,13 +80,13 @@ func (s *versionSeries) popOldVersions(modifiedBefore time.Time) []objectVersion
 		end = idx
 	}
 
-	var result []objectVersion
-
 	if end >= 0 {
-		result = slices.Clone(s.items[:end+1])
+		result.expired = slices.Clone(s.items[:end+1])
 
 		s.items = slices.Replace(s.items, 0, end+1)
 	}
+
+	result.keep = s.items
 
 	return result
 }
@@ -125,9 +132,21 @@ func (p *processor) run(ctx context.Context, in <-chan objectVersion, deleteCh c
 
 		s.add(ov)
 
-		for _, i := range s.popOldVersions(p.modifiedBefore) {
+		for _, i := range s.check(p.modifiedBefore).expired {
+			// Early deletions
 			deleteCh <- i
 		}
+	}
+
+	for _, s := range objects {
+		checkResult := s.check(p.modifiedBefore)
+
+		for _, i := range checkResult.expired {
+			deleteCh <- i
+		}
+
+		// TODO: Forward versions to keep to a processor extending retention
+		// duration where necessary.
 	}
 
 	return nil
