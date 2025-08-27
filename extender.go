@@ -1,0 +1,124 @@
+package main
+
+import (
+	"context"
+	"fmt"
+	"log/slog"
+	"time"
+
+	"golang.org/x/sync/errgroup"
+)
+
+type retentionExtenderState interface {
+	SetObjectRetention(string, string, time.Time) error
+}
+
+type retentionExtenderClient interface {
+	putObjectRetention(context.Context, string, string, time.Time) error
+}
+
+type retentionExtender struct {
+	logger *slog.Logger
+	state  retentionExtenderState
+	client retentionExtenderClient
+
+	workers int
+
+	now time.Time
+
+	extendBy time.Duration
+
+	minRemaining time.Duration
+
+	dryRun bool
+}
+
+type retentionExtenderOptions struct {
+	logger *slog.Logger
+	state  retentionExtenderState
+	client retentionExtenderClient
+	dryRun bool
+
+	// Current time for computations. Defaults to [time.Now()].
+	now time.Time
+
+	// Extend retention by this amount into the future.
+	extendBy time.Duration
+
+	// Minimum amount of remaining retention before extending again.
+	minRemaining time.Duration
+}
+
+func newRetentionExtender(opts retentionExtenderOptions) *retentionExtender {
+	if opts.now.IsZero() {
+		opts.now = time.Now()
+	}
+
+	return &retentionExtender{
+		logger:       opts.logger,
+		state:        opts.state,
+		client:       opts.client,
+		dryRun:       opts.dryRun,
+		now:          opts.now,
+		extendBy:     max(0, opts.extendBy),
+		minRemaining: max(0, opts.minRemaining),
+
+		workers: 4,
+	}
+}
+
+func (e *retentionExtender) extend(ctx context.Context, ov objectVersion) error {
+	if ov.deleteMarker {
+		// Delete markers don't support retention periods.
+		return nil
+	}
+
+	until := e.now.Add(e.extendBy)
+
+	if ov.retainUntil.IsZero() || (until.After(ov.retainUntil) && ov.retainUntil.Sub(e.now) < e.minRemaining) {
+		e.logger.InfoContext(ctx, "Extending object retention",
+			slog.Any("object", ov),
+			slog.Time("until", until),
+		)
+
+		if !e.dryRun {
+			if err := e.client.putObjectRetention(ctx, ov.key, ov.versionID, until); err != nil {
+				return fmt.Errorf("setting object retention via API: %w", err)
+			}
+
+			if err := e.state.SetObjectRetention(ov.key, ov.versionID, until); err != nil {
+				return fmt.Errorf("setting object retention in state: %w", err)
+			}
+		}
+	}
+
+	return nil
+}
+
+// run extends the retention duration on all objects received from the incoming
+// channel.
+func (e *retentionExtender) run(ctx context.Context, in <-chan objectVersion) error {
+	g, ctx := errgroup.WithContext(ctx)
+
+	for range max(1, e.workers) {
+		g.Go(func() error {
+			for {
+				select {
+				case <-ctx.Done():
+					return ctx.Err()
+
+				case ov, ok := <-in:
+					if !ok {
+						return nil
+					}
+
+					if err := e.extend(ctx, ov); err != nil {
+						return err
+					}
+				}
+			}
+		})
+	}
+
+	return g.Wait()
+}
