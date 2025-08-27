@@ -25,9 +25,9 @@ type versionHandler interface {
 }
 
 func annotateError(err *error, format string, args ...any) {
-	prefix := fmt.Sprintf(format, args...)
-
 	if *err != nil {
+		prefix := fmt.Sprintf(format, args...)
+
 		*err = fmt.Errorf("%s: %w", prefix, *err)
 	}
 }

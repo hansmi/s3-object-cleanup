@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -10,6 +11,24 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 )
+
+func TestAnnotateError(t *testing.T) {
+	var err error
+
+	annotateError(&err, "unused")
+
+	if err != nil {
+		t.Errorf("annotateError(nil) modified error: %v", err)
+	}
+
+	err = os.ErrInvalid
+
+	annotateError(&err, "first=%d, second=%d", 1, 2)
+
+	if !strings.HasPrefix(err.Error(), "first=1, second=2:") {
+		t.Errorf("annotateError(ErrInvalid) returned wrong prefix: %v", err)
+	}
+}
 
 func TestIsNotExist(t *testing.T) {
 	for _, tc := range []struct {
