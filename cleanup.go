@@ -103,7 +103,7 @@ func newProcessor(stats *cleanupStats, modifiedBefore time.Time) *processor {
 	}
 }
 
-func (p *processor) run(ctx context.Context, in <-chan objectVersion, deleteCh chan<- objectVersion) error {
+func (p *processor) run(ctx context.Context, in <-chan objectVersion, extendCh, deleteCh chan<- objectVersion) error {
 	objects := map[string]*versionSeries{}
 
 	for {
@@ -145,8 +145,9 @@ func (p *processor) run(ctx context.Context, in <-chan objectVersion, deleteCh c
 			deleteCh <- i
 		}
 
-		// TODO: Forward versions to keep to a processor extending retention
-		// duration where necessary.
+		for _, i := range checkResult.keep {
+			extendCh <- i
+		}
 	}
 
 	return nil
@@ -169,6 +170,7 @@ func cleanup(ctx context.Context, opts cleanupOptions) error {
 
 	annotateCh := make(chan objectVersion, 8)
 	handleCh := make(chan objectVersion, 8)
+	extendCh := make(chan objectVersion, 8)
 	deleteCh := make(chan objectVersion, 8)
 
 	g, ctx := errgroup.WithContext(ctx)
@@ -186,10 +188,23 @@ func cleanup(ctx context.Context, opts cleanupOptions) error {
 	})
 	g.Go(func() error {
 		defer close(deleteCh)
+		defer close(extendCh)
 
 		p := newProcessor(opts.stats, opts.modifiedBefore)
 
-		return p.run(ctx, handleCh, deleteCh)
+		return p.run(ctx, handleCh, extendCh, deleteCh)
+	})
+	g.Go(func() error {
+		e := newRetentionExtender(retentionExtenderOptions{
+			logger:       opts.logger,
+			state:        bucketState,
+			client:       opts.client,
+			dryRun:       opts.dryRun,
+			extendBy:     30 * 24 * time.Hour,
+			minRemaining: 14 * 24 * time.Hour,
+		})
+
+		return e.run(ctx, extendCh)
 	})
 	g.Go(func() error {
 		deleter := newBatchDeleter(opts.logger, opts.stats, opts.client, opts.dryRun)
