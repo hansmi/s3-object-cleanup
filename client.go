@@ -32,6 +32,20 @@ func annotateError(err *error, format string, args ...any) {
 	}
 }
 
+func isNotExist(err error) bool {
+	var errNoSuchKey *types.NoSuchKey
+	var errApi smithy.APIError
+
+	switch {
+	case errors.As(err, &errNoSuchKey):
+		return true
+	case errors.As(err, &errApi) && errApi.ErrorCode() == errorCodeNoSuchKey:
+		return true
+	}
+
+	return false
+}
+
 type client struct {
 	client *s3.Client
 	name   string
@@ -125,13 +139,8 @@ func getObjectRetentionImpl(ctx context.Context, c getObjectRetentionClient, buc
 		VersionId: aws.String(versionID),
 	})
 	if err != nil {
-		var errNoSuchKey *types.NoSuchKey
-		var errApi smithy.APIError
-
-		switch {
-		case errors.As(err, &errNoSuchKey):
-			fallthrough
-		case errors.As(err, &errApi) && errApi.ErrorCode() == errorCodeNoSuchKey:
+		if isNotExist(err) {
+			// Version may have been deleted.
 			err = nil
 		}
 
@@ -141,6 +150,38 @@ func getObjectRetentionImpl(ctx context.Context, c getObjectRetentionClient, buc
 	return aws.ToTime(result.Retention.RetainUntilDate), nil
 }
 
-func (c *client) getObjectRetention(ctx context.Context, key, versionID string) (_ time.Time, err error) {
+func (c *client) getObjectRetention(ctx context.Context, key, versionID string) (time.Time, error) {
 	return getObjectRetentionImpl(ctx, c.client, c.name, key, versionID)
+}
+
+type putObjectRetentionClient interface {
+	PutObjectRetention(context.Context, *s3.PutObjectRetentionInput, ...func(*s3.Options)) (*s3.PutObjectRetentionOutput, error)
+}
+
+func putObjectRetentionImpl(ctx context.Context, c putObjectRetentionClient, bucket, key, versionID string, until time.Time) (err error) {
+	defer annotateError(&err, "key %q, version %q", key, versionID)
+
+	_, err = c.PutObjectRetention(ctx, &s3.PutObjectRetentionInput{
+		Bucket:    aws.String(bucket),
+		Key:       aws.String(key),
+		VersionId: aws.String(versionID),
+		Retention: &types.ObjectLockRetention{
+			// TODO: ObjectLockRetentionMode may be required
+			RetainUntilDate: aws.Time(until),
+		},
+	})
+	if err != nil {
+		if isNotExist(err) {
+			// Version may have been deleted.
+			err = nil
+		}
+
+		return err
+	}
+
+	return nil
+}
+
+func (c *client) putObjectRetention(ctx context.Context, key, versionID string, until time.Time) (err error) {
+	return putObjectRetentionImpl(ctx, c.client, c.name, key, versionID, until)
 }

@@ -5,9 +5,52 @@ import (
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/aws/smithy-go"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 )
+
+func TestIsNotExist(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{name: "nil"},
+		{
+			name: "invalid",
+			err:  os.ErrInvalid,
+		},
+		{
+			name: "NoSuchKey",
+			err: &types.NoSuchKey{
+				Message: aws.String("mykey"),
+			},
+			want: true,
+		},
+		{
+			name: "API error",
+			err: &smithy.GenericAPIError{
+				Code:    errorCodeNoSuchKey,
+				Message: "mykey",
+			},
+			want: true,
+		},
+		{
+			name: "unrelated API error",
+			err:  &smithy.GenericAPIError{},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := isNotExist(tc.err)
+
+			if got != tc.want {
+				t.Errorf("isNotExist(%#v) = %v, want %v", tc.err, got, tc.want)
+			}
+		})
+	}
+}
 
 func TestNewClientFromName(t *testing.T) {
 	for _, tc := range []struct {
