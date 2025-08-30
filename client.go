@@ -19,11 +19,6 @@ import (
 
 const errorCodeNoSuchKey = "NoSuchKey"
 
-type versionHandler interface {
-	handleDeleteMarker(types.DeleteMarkerEntry) error
-	handleVersion(types.ObjectVersion) error
-}
-
 func annotateError(err *error, format string, args ...any) {
 	if *err != nil {
 		prefix := fmt.Sprintf(format, args...)
