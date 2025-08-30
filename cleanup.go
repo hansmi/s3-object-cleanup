@@ -19,8 +19,8 @@ type versionSeriesResult struct {
 
 type versionSeries struct {
 	key        string
-	haveLatest bool
 	items      []objectVersion
+	haveLatest bool
 }
 
 func newVersionSeries(key string) *versionSeries {

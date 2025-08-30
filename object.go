@@ -9,13 +9,16 @@ import (
 )
 
 type objectVersion struct {
-	key          string
-	versionID    string
 	lastModified time.Time
+	retainUntil  time.Time
+
+	key       string
+	versionID string
+
+	size int64
+
 	isLatest     bool
 	deleteMarker bool
-	size         int64
-	retainUntil  time.Time
 }
 
 var _ slog.LogValuer = (*objectVersion)(nil)
