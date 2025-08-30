@@ -13,12 +13,17 @@ import (
 )
 
 type fakeExtenderClient struct {
+	mu       sync.Mutex
 	requests []time.Time
 	err      error
 }
 
 func (c *fakeExtenderClient) PutObjectRetention(_ context.Context, _ string, _ string, until time.Time) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	c.requests = append(c.requests, until)
+
 	return c.err
 }
 
