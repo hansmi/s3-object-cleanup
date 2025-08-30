@@ -107,6 +107,7 @@ func newProcessor(stats *cleanupStats, modifiedBefore time.Time) *processor {
 func (p *processor) run(ctx context.Context, in <-chan objectVersion, extendCh, deleteCh chan<- objectVersion) error {
 	objects := map[string]*versionSeries{}
 
+loop:
 	for {
 		var ov objectVersion
 		var ok bool
@@ -117,7 +118,7 @@ func (p *processor) run(ctx context.Context, in <-chan objectVersion, extendCh, 
 
 		case ov, ok = <-in:
 			if !ok {
-				return nil
+				break loop
 			}
 		}
 
