@@ -14,7 +14,7 @@ type retentionExtenderState interface {
 }
 
 type retentionExtenderClient interface {
-	putObjectRetention(context.Context, string, string, time.Time) error
+	PutObjectRetention(context.Context, string, string, time.Time) error
 }
 
 type retentionExtender struct {
@@ -82,7 +82,7 @@ func (e *retentionExtender) extend(ctx context.Context, ov objectVersion) error 
 		)
 
 		if !e.dryRun {
-			if err := e.client.putObjectRetention(ctx, ov.key, ov.versionID, until); err != nil {
+			if err := e.client.PutObjectRetention(ctx, ov.key, ov.versionID, until); err != nil {
 				return fmt.Errorf("setting object retention via API: %w", err)
 			}
 

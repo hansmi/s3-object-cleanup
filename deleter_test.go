@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/hansmi/s3-object-cleanup/internal/client"
 )
 
 func TestBatchDeleter(t *testing.T) {
@@ -50,9 +51,9 @@ func TestBatchDeleter(t *testing.T) {
 
 			stats := newCleanupStats()
 
-			b, err := newClientFromName(aws.Config{}, "test")
+			b, err := client.NewFromName(aws.Config{}, "test")
 			if err != nil {
-				t.Fatalf("newClientFromName() failed: %v", err)
+				t.Fatalf("NewFromName() failed: %v", err)
 			}
 
 			d := newBatchDeleter(logger, stats, b, true)

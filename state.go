@@ -6,12 +6,13 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/hansmi/s3-object-cleanup/internal/client"
 	"github.com/hansmi/s3-object-cleanup/internal/state"
 )
 
 // downloadStateFromBucket downloads a compressed state database snapshot from
 // an S3 bucket.
-func downloadStateFromBucket(ctx context.Context, tmpdir string, c *client, key string) (_ *state.Store, err error) {
+func downloadStateFromBucket(ctx context.Context, tmpdir string, c *client.Client, key string) (_ *state.Store, err error) {
 	tmpfile, err := state.CreateUnlinkedTemp(tmpdir, "download*")
 	if err != nil {
 		return nil, err
@@ -19,7 +20,7 @@ func downloadStateFromBucket(ctx context.Context, tmpdir string, c *client, key 
 
 	defer tmpfile.Close()
 
-	if err := c.downloadObject(ctx, tmpfile, key); err != nil {
+	if err := c.DownloadObject(ctx, tmpfile, key); err != nil {
 		return nil, fmt.Errorf("object %q download: %w", key, err)
 	}
 
@@ -31,7 +32,7 @@ func downloadStateFromBucket(ctx context.Context, tmpdir string, c *client, key 
 }
 
 // uploadStateToBucket uploads a compressed state database snapshot to an S3 bucket.
-func uploadStateToBucket(ctx context.Context, s *state.Store, tmpdir string, c *client, key string) (err error) {
+func uploadStateToBucket(ctx context.Context, s *state.Store, tmpdir string, c *client.Client, key string) (err error) {
 	f, err := s.WriteCompressed(tmpdir)
 	if err != nil {
 		return err
@@ -41,5 +42,5 @@ func uploadStateToBucket(ctx context.Context, s *state.Store, tmpdir string, c *
 		err = errors.Join(err, f.Close())
 	}()
 
-	return c.uploadObject(ctx, f, key)
+	return c.UploadObject(ctx, f, key)
 }

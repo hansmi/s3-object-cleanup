@@ -14,7 +14,7 @@ type retentionAnnotatorState interface {
 }
 
 type retentionAnnotatorClient interface {
-	getObjectRetention(context.Context, string, string) (time.Time, error)
+	GetObjectRetention(context.Context, string, string) (time.Time, error)
 }
 
 type retentionAnnotator struct {
@@ -44,7 +44,7 @@ func (a *retentionAnnotator) annotate(ctx context.Context, ov objectVersion) (ob
 
 		// Delete markers don't support retention periods.
 		if until.IsZero() && !ov.deleteMarker {
-			until, err = a.client.getObjectRetention(ctx, ov.key, ov.versionID)
+			until, err = a.client.GetObjectRetention(ctx, ov.key, ov.versionID)
 			if err != nil {
 				return ov, fmt.Errorf("getting object retention from API: %w", err)
 			}

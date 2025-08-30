@@ -1,4 +1,4 @@
-package main
+package client
 
 import (
 	"os"
@@ -30,7 +30,7 @@ func TestAnnotateError(t *testing.T) {
 	}
 }
 
-func TestIsNotExist(t *testing.T) {
+func TestIsNoSuchKey(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		err  error
@@ -62,16 +62,16 @@ func TestIsNotExist(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			got := isNotExist(tc.err)
+			got := IsNoSuchKey(tc.err)
 
 			if got != tc.want {
-				t.Errorf("isNotExist(%#v) = %v, want %v", tc.err, got, tc.want)
+				t.Errorf("IsNoSuchKey(%#v) = %v, want %v", tc.err, got, tc.want)
 			}
 		})
 	}
 }
 
-func TestNewClientFromName(t *testing.T) {
+func TestNewFromName(t *testing.T) {
 	for _, tc := range []struct {
 		name         string
 		input        string
@@ -112,7 +112,7 @@ func TestNewClientFromName(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			var cfg aws.Config
 
-			got, err := newClientFromName(cfg, tc.input)
+			got, err := NewFromName(cfg, tc.input)
 
 			if diff := cmp.Diff(tc.wantErr, err, cmpopts.EquateErrors()); diff != "" {
 				t.Errorf("Error diff (-want +got):\n%s", diff)

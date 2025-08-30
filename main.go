@@ -14,6 +14,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/smithy-go/logging"
+	"github.com/hansmi/s3-object-cleanup/internal/client"
 	"github.com/hansmi/s3-object-cleanup/internal/state"
 )
 
@@ -70,10 +71,10 @@ func (p *program) run(ctx context.Context, bucketNames []string) (err error) {
 		return err
 	}
 
-	var clients []*client
+	var clients []*client.Client
 
 	for _, i := range bucketNames {
-		c, err := newClientFromName(cfg, i)
+		c, err := client.NewFromName(cfg, i)
 		if err != nil {
 			return err
 		}
@@ -101,7 +102,7 @@ func (p *program) run(ctx context.Context, bucketNames []string) (err error) {
 	if p.persistenceBucket != "" {
 		const key = "state.gz"
 
-		c, err := newClientFromName(cfg, p.persistenceBucket)
+		c, err := client.NewFromName(cfg, p.persistenceBucket)
 		if err != nil {
 			return err
 		}
@@ -134,7 +135,7 @@ func (p *program) run(ctx context.Context, bucketNames []string) (err error) {
 	var bucketErrors []error
 
 	for _, c := range clients {
-		logger := slog.With(slog.String("bucket", c.name))
+		logger := slog.With(slog.String("bucket", c.Name()))
 
 		if err := cleanup(ctx, cleanupOptions{
 			logger:                logger,
@@ -148,7 +149,7 @@ func (p *program) run(ctx context.Context, bucketNames []string) (err error) {
 		}); err != nil {
 			logger.Error("Cleanup failed", slog.Any("error", err))
 
-			bucketErrors = append(bucketErrors, fmt.Errorf("%s: %w", c.name, err))
+			bucketErrors = append(bucketErrors, fmt.Errorf("%s: %w", c.Name(), err))
 		}
 	}
 

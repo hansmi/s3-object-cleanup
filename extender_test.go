@@ -17,7 +17,7 @@ type fakeExtenderClient struct {
 	err      error
 }
 
-func (c *fakeExtenderClient) putObjectRetention(_ context.Context, _ string, _ string, until time.Time) error {
+func (c *fakeExtenderClient) PutObjectRetention(_ context.Context, _ string, _ string, until time.Time) error {
 	c.requests = append(c.requests, until)
 	return c.err
 }

@@ -8,6 +8,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/hansmi/s3-object-cleanup/internal/client"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -24,13 +25,13 @@ type batchDeleter struct {
 	bucketName string
 }
 
-func newBatchDeleter(logger *slog.Logger, stats *cleanupStats, c *client, dryRun bool) *batchDeleter {
+func newBatchDeleter(logger *slog.Logger, stats *cleanupStats, c *client.Client, dryRun bool) *batchDeleter {
 	return &batchDeleter{
 		logger:     logger,
 		stats:      stats,
 		dryRun:     dryRun,
-		client:     c.client,
-		bucketName: c.name,
+		client:     c.S3(),
+		bucketName: c.Name(),
 	}
 }
 

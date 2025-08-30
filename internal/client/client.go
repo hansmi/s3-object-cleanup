@@ -1,4 +1,4 @@
-package main
+package client
 
 import (
 	"context"
@@ -27,7 +27,7 @@ func annotateError(err *error, format string, args ...any) {
 	}
 }
 
-func isNotExist(err error) bool {
+func IsNoSuchKey(err error) bool {
 	var errNoSuchKey *types.NoSuchKey
 	var errApi smithy.APIError
 
@@ -41,14 +41,14 @@ func isNotExist(err error) bool {
 	return false
 }
 
-type client struct {
+type Client struct {
 	client *s3.Client
 	name   string
 	prefix string
 }
 
-func newClientFromName(cfg aws.Config, input string) (*client, error) {
-	result := &client{
+func NewFromName(cfg aws.Config, input string) (*Client, error) {
+	result := &Client{
 		name: input,
 	}
 
@@ -89,7 +89,19 @@ func newClientFromName(cfg aws.Config, input string) (*client, error) {
 	return result, nil
 }
 
-func (c *client) downloadObject(ctx context.Context, w io.WriterAt, key string) (err error) {
+func (c *Client) Name() string {
+	return c.name
+}
+
+func (c *Client) Prefix() string {
+	return c.prefix
+}
+
+func (c *Client) S3() *s3.Client {
+	return c.client
+}
+
+func (c *Client) DownloadObject(ctx context.Context, w io.WriterAt, key string) (err error) {
 	defer annotateError(&err, "key %q", key)
 
 	downloader := manager.NewDownloader(c.client)
@@ -102,7 +114,7 @@ func (c *client) downloadObject(ctx context.Context, w io.WriterAt, key string) 
 	return err
 }
 
-func (c *client) uploadObject(ctx context.Context, r io.Reader, key string) (err error) {
+func (c *Client) UploadObject(ctx context.Context, r io.Reader, key string) (err error) {
 	defer annotateError(&err, "key %q", key)
 
 	uploader := manager.NewUploader(c.client)
@@ -121,11 +133,11 @@ func (c *client) uploadObject(ctx context.Context, r io.Reader, key string) (err
 	}, time.Minute)
 }
 
-type getObjectRetentionClient interface {
+type GetObjectRetentionClient interface {
 	GetObjectRetention(context.Context, *s3.GetObjectRetentionInput, ...func(*s3.Options)) (*s3.GetObjectRetentionOutput, error)
 }
 
-func getObjectRetentionImpl(ctx context.Context, c getObjectRetentionClient, bucket, key, versionID string) (_ time.Time, err error) {
+func getObjectRetentionImpl(ctx context.Context, c GetObjectRetentionClient, bucket, key, versionID string) (_ time.Time, err error) {
 	defer annotateError(&err, "key %q, version %q", key, versionID)
 
 	result, err := c.GetObjectRetention(ctx, &s3.GetObjectRetentionInput{
@@ -134,7 +146,7 @@ func getObjectRetentionImpl(ctx context.Context, c getObjectRetentionClient, buc
 		VersionId: aws.String(versionID),
 	})
 	if err != nil {
-		if isNotExist(err) {
+		if IsNoSuchKey(err) {
 			// Version may have been deleted.
 			err = nil
 		}
@@ -145,7 +157,7 @@ func getObjectRetentionImpl(ctx context.Context, c getObjectRetentionClient, buc
 	return aws.ToTime(result.Retention.RetainUntilDate), nil
 }
 
-func (c *client) getObjectRetention(ctx context.Context, key, versionID string) (time.Time, error) {
+func (c *Client) GetObjectRetention(ctx context.Context, key, versionID string) (time.Time, error) {
 	return getObjectRetentionImpl(ctx, c.client, c.name, key, versionID)
 }
 
@@ -166,7 +178,7 @@ func putObjectRetentionImpl(ctx context.Context, c putObjectRetentionClient, buc
 		},
 	})
 	if err != nil {
-		if isNotExist(err) {
+		if IsNoSuchKey(err) {
 			// Version may have been deleted.
 			err = nil
 		}
@@ -177,6 +189,6 @@ func putObjectRetentionImpl(ctx context.Context, c putObjectRetentionClient, buc
 	return nil
 }
 
-func (c *client) putObjectRetention(ctx context.Context, key, versionID string, until time.Time) (err error) {
+func (c *Client) PutObjectRetention(ctx context.Context, key, versionID string, until time.Time) (err error) {
 	return putObjectRetentionImpl(ctx, c.client, c.name, key, versionID, until)
 }

@@ -38,7 +38,7 @@ type fakeRetentionClient struct {
 	err   error
 }
 
-func (c *fakeRetentionClient) getObjectRetention(context.Context, string, string) (time.Time, error) {
+func (c *fakeRetentionClient) GetObjectRetention(context.Context, string, string) (time.Time, error) {
 	return c.until, c.err
 }
 

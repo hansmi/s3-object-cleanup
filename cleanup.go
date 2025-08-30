@@ -8,6 +8,7 @@ import (
 	"slices"
 	"time"
 
+	"github.com/hansmi/s3-object-cleanup/internal/client"
 	"github.com/hansmi/s3-object-cleanup/internal/state"
 	"golang.org/x/sync/errgroup"
 )
@@ -157,7 +158,7 @@ type cleanupOptions struct {
 	logger         *slog.Logger
 	stats          *cleanupStats
 	state          *state.Store
-	client         *client
+	client         *client.Client
 	dryRun         bool
 	modifiedBefore time.Time
 
@@ -166,7 +167,7 @@ type cleanupOptions struct {
 }
 
 func cleanup(ctx context.Context, opts cleanupOptions) error {
-	bucketState, err := opts.state.Bucket(opts.client.name)
+	bucketState, err := opts.state.Bucket(opts.client.Name())
 	if err != nil {
 		return fmt.Errorf("bucket state: %w", err)
 	}
@@ -180,7 +181,7 @@ func cleanup(ctx context.Context, opts cleanupOptions) error {
 	g.Go(func() error {
 		defer close(annotateCh)
 
-		return listObjectVersions(ctx, opts.client.client, opts.client.name, opts.client.prefix, annotateCh)
+		return listObjectVersions(ctx, opts.client.S3(), opts.client.Name(), opts.client.Prefix(), annotateCh)
 	})
 	g.Go(func() error {
 		defer close(handleCh)
