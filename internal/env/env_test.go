@@ -1,4 +1,4 @@
-package main
+package env
 
 import (
 	"os"
@@ -13,7 +13,7 @@ import (
 
 const envVarName = "pb_test_var"
 
-func TestGetenvBool(t *testing.T) {
+func TestGetBool(t *testing.T) {
 	for _, tc := range []struct {
 		name     string
 		value    *string
@@ -54,20 +54,20 @@ func TestGetenvBool(t *testing.T) {
 				os.Setenv(envVarName, *tc.value)
 			}
 
-			got, err := getenvBool(envVarName, tc.fallback)
+			got, err := GetBool(envVarName, tc.fallback)
 
 			if diff := cmp.Diff(tc.wantErr, err, cmpopts.EquateErrors()); diff != "" {
 				t.Errorf("Error diff (-want +got):\n%s", diff)
 			}
 
 			if diff := cmp.Diff(tc.want, got); diff != "" {
-				t.Errorf("GetenvBool diff (-want +got):\n%s", diff)
+				t.Errorf("GetBool diff (-want +got):\n%s", diff)
 			}
 		})
 	}
 }
 
-func TestGetenvDuration(t *testing.T) {
+func TestGetDuration(t *testing.T) {
 	for _, tc := range []struct {
 		name     string
 		value    *string
@@ -103,14 +103,14 @@ func TestGetenvDuration(t *testing.T) {
 				os.Setenv(envVarName, *tc.value)
 			}
 
-			got, err := getenvDuration(envVarName, tc.fallback)
+			got, err := GetDuration(envVarName, tc.fallback)
 
 			if diff := cmp.Diff(tc.wantErr, err, cmpopts.EquateErrors()); diff != "" {
 				t.Errorf("Error diff (-want +got):\n%s", diff)
 			}
 
 			if diff := cmp.Diff(tc.want, got); diff != "" {
-				t.Errorf("GetenvDuration diff (-want +got):\n%s", diff)
+				t.Errorf("GetDuration diff (-want +got):\n%s", diff)
 			}
 		})
 	}

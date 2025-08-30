@@ -15,6 +15,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/smithy-go/logging"
 	"github.com/hansmi/s3-object-cleanup/internal/client"
+	"github.com/hansmi/s3-object-cleanup/internal/env"
 	"github.com/hansmi/s3-object-cleanup/internal/state"
 )
 
@@ -34,26 +35,26 @@ type program struct {
 
 func (p *program) registerFlags() {
 	flag.BoolVar(&p.dryRun, "dry_run",
-		mustGetenvBool("S3_OBJECT_CLEANUP_DRY_RUN", true),
+		env.MustGetBool("S3_OBJECT_CLEANUP_DRY_RUN", true),
 		"Perform a trial run without actually deleting objects. Defaults to $S3_OBJECT_CLEANUP_DRY_RUN.")
 
 	flag.DurationVar(&p.minAge, "min_age",
-		mustGetenvDuration("S3_OBJECT_CLEANUP_MIN_AGE", minAgeDaysDefault*24*time.Hour),
+		env.MustGetDuration("S3_OBJECT_CLEANUP_MIN_AGE", minAgeDaysDefault*24*time.Hour),
 		fmt.Sprintf("Minimum object version age. Defaults to $S3_OBJECT_CLEANUP_MIN_AGE or %d days.",
 			minAgeDaysDefault))
 
 	flag.DurationVar(&p.minRetention, "min_retention",
-		mustGetenvDuration("S3_OBJECT_CLEANUP_MIN_RETENTION", defaultMinRetentionDays*24*time.Hour),
+		env.MustGetDuration("S3_OBJECT_CLEANUP_MIN_RETENTION", defaultMinRetentionDays*24*time.Hour),
 		fmt.Sprintf("Set or extend the retention of object versions to be at least the given amount of time. Defaults to $S3_OBJECT_CLEANUP_MIN_RETENTION or %d days.",
 			defaultMinRetentionDays))
 
 	flag.DurationVar(&p.minRetentionThreshold, "min_retention_threshold",
-		mustGetenvDuration("S3_OBJECT_CLEANUP_MIN_RETENTION_THRESHOLD", defaultMinRetentionThresholdDays*24*time.Hour),
+		env.MustGetDuration("S3_OBJECT_CLEANUP_MIN_RETENTION_THRESHOLD", defaultMinRetentionThresholdDays*24*time.Hour),
 		fmt.Sprintf("Object version retention is set when it's missing or the remaining amount of time falls below the given value. Defaults to $S3_OBJECT_CLEANUP_MIN_RETENTION_THRESHOLD or %d days.",
 			defaultMinRetentionThresholdDays))
 
 	flag.StringVar(&p.persistenceBucket, "persistence_bucket",
-		getenvWithFallback("S3_OBJECT_CLEANUP_PERSISTENCE_BUCKET", ""),
+		env.GetWithFallback("S3_OBJECT_CLEANUP_PERSISTENCE_BUCKET", ""),
 		`URL to an S3 bucket for storing a information reducing API calls. Defaults to $S3_OBJECT_CLEANUP_PERSISTENCE_BUCKET.`)
 }
 

@@ -1,4 +1,4 @@
-package main
+package env
 
 import (
 	"fmt"
@@ -16,7 +16,7 @@ func successOrDie[T any](value T, err error) T {
 	return value
 }
 
-func getenvWithFallback(key, fallback string) string {
+func GetWithFallback(key, fallback string) string {
 	if value := os.Getenv(key); value != "" {
 		return value
 	}
@@ -24,7 +24,7 @@ func getenvWithFallback(key, fallback string) string {
 	return fallback
 }
 
-func getenvBool(key string, fallback bool) (bool, error) {
+func GetBool(key string, fallback bool) (bool, error) {
 	if raw := os.Getenv(key); raw != "" {
 		parsed, err := strconv.ParseBool(raw)
 		if err != nil {
@@ -37,11 +37,11 @@ func getenvBool(key string, fallback bool) (bool, error) {
 	return fallback, nil
 }
 
-func mustGetenvBool(key string, fallback bool) bool {
-	return successOrDie(getenvBool(key, fallback))
+func MustGetBool(key string, fallback bool) bool {
+	return successOrDie(GetBool(key, fallback))
 }
 
-func getenvDuration(key string, fallback time.Duration) (time.Duration, error) {
+func GetDuration(key string, fallback time.Duration) (time.Duration, error) {
 	if raw := os.Getenv(key); raw != "" {
 		parsed, err := time.ParseDuration(raw)
 		if err != nil {
@@ -54,6 +54,6 @@ func getenvDuration(key string, fallback time.Duration) (time.Duration, error) {
 	return fallback, nil
 }
 
-func mustGetenvDuration(key string, fallback time.Duration) time.Duration {
-	return successOrDie(getenvDuration(key, fallback))
+func MustGetDuration(key string, fallback time.Duration) time.Duration {
+	return successOrDie(GetDuration(key, fallback))
 }
