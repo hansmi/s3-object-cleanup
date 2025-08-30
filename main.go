@@ -18,12 +18,17 @@ import (
 )
 
 const minAgeDaysDefault = 32
+const defaultMinRetentionDays = 32
+const defaultMinRetentionThresholdDays = defaultMinRetentionDays / 4
 
 type program struct {
 	dryRun bool
 	minAge time.Duration
 
 	persistenceBucket string
+
+	minRetention          time.Duration
+	minRetentionThreshold time.Duration
 }
 
 func (p *program) registerFlags() {
@@ -35,6 +40,16 @@ func (p *program) registerFlags() {
 		mustGetenvDuration("S3_OBJECT_CLEANUP_MIN_AGE", minAgeDaysDefault*24*time.Hour),
 		fmt.Sprintf("Minimum object version age. Defaults to $S3_OBJECT_CLEANUP_MIN_AGE or %d days.",
 			minAgeDaysDefault))
+
+	flag.DurationVar(&p.minRetention, "min_retention",
+		mustGetenvDuration("S3_OBJECT_CLEANUP_MIN_RETENTION", defaultMinRetentionDays*24*time.Hour),
+		fmt.Sprintf("Set or extend the retention of object versions to be at least the given amount of time. Defaults to $S3_OBJECT_CLEANUP_MIN_RETENTION or %d days.",
+			defaultMinRetentionDays))
+
+	flag.DurationVar(&p.minRetentionThreshold, "min_retention_threshold",
+		mustGetenvDuration("S3_OBJECT_CLEANUP_MIN_RETENTION_THRESHOLD", defaultMinRetentionThresholdDays*24*time.Hour),
+		fmt.Sprintf("Object version retention is set when it's missing or the remaining amount of time falls below the given value. Defaults to $S3_OBJECT_CLEANUP_MIN_RETENTION_THRESHOLD or %d days.",
+			defaultMinRetentionThresholdDays))
 
 	flag.StringVar(&p.persistenceBucket, "persistence_bucket",
 		getenvWithFallback("S3_OBJECT_CLEANUP_PERSISTENCE_BUCKET", ""),
@@ -64,6 +79,11 @@ func (p *program) run(ctx context.Context, bucketNames []string) (err error) {
 		}
 
 		clients = append(clients, c)
+	}
+
+	if p.minRetentionThreshold > p.minRetention {
+		return fmt.Errorf("min_retention_threshold (%v) may not exceed min_retention (%v)",
+			p.minRetentionThreshold.String(), p.minRetention.String())
 	}
 
 	tmpdir, err := os.MkdirTemp("", "")
@@ -117,12 +137,14 @@ func (p *program) run(ctx context.Context, bucketNames []string) (err error) {
 		logger := slog.With(slog.String("bucket", c.name))
 
 		if err := cleanup(ctx, cleanupOptions{
-			logger:         logger,
-			stats:          stats,
-			state:          s,
-			client:         c,
-			dryRun:         p.dryRun,
-			modifiedBefore: modifiedBefore,
+			logger:                logger,
+			stats:                 stats,
+			state:                 s,
+			client:                c,
+			dryRun:                p.dryRun,
+			modifiedBefore:        modifiedBefore,
+			minRetention:          p.minRetention,
+			minRetentionThreshold: p.minRetentionThreshold,
 		}); err != nil {
 			logger.Error("Cleanup failed", slog.Any("error", err))
 

@@ -160,6 +160,9 @@ type cleanupOptions struct {
 	client         *client
 	dryRun         bool
 	modifiedBefore time.Time
+
+	minRetention          time.Duration
+	minRetentionThreshold time.Duration
 }
 
 func cleanup(ctx context.Context, opts cleanupOptions) error {
