@@ -26,9 +26,8 @@ type retentionExtender struct {
 
 	now time.Time
 
-	extendBy time.Duration
-
-	minRemaining time.Duration
+	minRetention time.Duration
+	threshold    time.Duration
 
 	dryRun bool
 }
@@ -42,11 +41,12 @@ type retentionExtenderOptions struct {
 	// Current time for computations. Defaults to [time.Now()].
 	now time.Time
 
-	// Extend retention by this amount into the future.
-	extendBy time.Duration
+	// Object version retention must be at least least the given duration.
+	minRetention time.Duration
 
-	// Minimum amount of remaining retention before extending again.
-	minRemaining time.Duration
+	// Set retention when it's missing or the remaining duration is less than
+	// the threshold.
+	threshold time.Duration
 }
 
 func newRetentionExtender(opts retentionExtenderOptions) *retentionExtender {
@@ -60,8 +60,8 @@ func newRetentionExtender(opts retentionExtenderOptions) *retentionExtender {
 		client:       opts.client,
 		dryRun:       opts.dryRun,
 		now:          opts.now,
-		extendBy:     max(0, opts.extendBy),
-		minRemaining: max(0, opts.minRemaining),
+		minRetention: max(0, opts.minRetention),
+		threshold:    max(0, opts.threshold),
 
 		workers: 4,
 	}
@@ -73,9 +73,9 @@ func (e *retentionExtender) extend(ctx context.Context, ov objectVersion) error 
 		return nil
 	}
 
-	until := e.now.Add(e.extendBy)
+	until := e.now.Add(e.minRetention)
 
-	if ov.retainUntil.IsZero() || (until.After(ov.retainUntil) && ov.retainUntil.Sub(e.now) < e.minRemaining) {
+	if ov.retainUntil.IsZero() || (until.After(ov.retainUntil) && ov.retainUntil.Sub(e.now) < e.threshold) {
 		e.logger.InfoContext(ctx, "Extending object retention",
 			slog.Any("object", ov),
 			slog.Time("until", until),

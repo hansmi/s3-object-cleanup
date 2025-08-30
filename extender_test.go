@@ -32,8 +32,8 @@ func TestExtend(t *testing.T) {
 	for _, tc := range []struct {
 		name         string
 		ov           objectVersion
-		extendBy     time.Duration
-		minRemaining time.Duration
+		minRetention time.Duration
+		threshold    time.Duration
 		want         []time.Time
 		wantErr      error
 	}{
@@ -46,8 +46,8 @@ func TestExtend(t *testing.T) {
 			ov: objectVersion{
 				retainUntil: time.Date(2015, time.January, 10, 0, 0, 0, 0, time.UTC),
 			},
-			extendBy:     14 * 24 * time.Hour,
-			minRemaining: 10 * 24 * time.Hour,
+			minRetention: 14 * 24 * time.Hour,
+			threshold:    10 * 24 * time.Hour,
 			want: []time.Time{
 				time.Date(2015, time.January, 15, 0, 0, 0, 0, time.UTC),
 			},
@@ -57,21 +57,21 @@ func TestExtend(t *testing.T) {
 			ov: objectVersion{
 				retainUntil: time.Date(2015, time.January, 10, 0, 0, 0, 0, time.UTC),
 			},
-			extendBy:     7 * 24 * time.Hour,
-			minRemaining: 14 * 24 * time.Hour,
+			minRetention: 7 * 24 * time.Hour,
+			threshold:    14 * 24 * time.Hour,
 		},
 		{
 			name: "not yet time for extension",
 			ov: objectVersion{
 				retainUntil: time.Date(2015, time.January, 10, 0, 0, 0, 0, time.UTC),
 			},
-			extendBy:     14 * 24 * time.Hour,
-			minRemaining: 24 * time.Hour,
+			minRetention: 14 * 24 * time.Hour,
+			threshold:    24 * time.Hour,
 		},
 		{
 			name:         "version has no retention",
-			extendBy:     7 * 24 * time.Hour,
-			minRemaining: 24 * time.Hour,
+			minRetention: 7 * 24 * time.Hour,
+			threshold:    24 * time.Hour,
 			want: []time.Time{
 				time.Date(2015, time.January, 8, 0, 0, 0, 0, time.UTC),
 			},
@@ -81,7 +81,7 @@ func TestExtend(t *testing.T) {
 			ov: objectVersion{
 				deleteMarker: true,
 			},
-			extendBy: 7 * 24 * time.Hour,
+			minRetention: 7 * 24 * time.Hour,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -93,8 +93,8 @@ func TestExtend(t *testing.T) {
 				state:        state,
 				client:       &client,
 				now:          now,
-				extendBy:     tc.extendBy,
-				minRemaining: tc.minRemaining,
+				minRetention: tc.minRetention,
+				threshold:    tc.threshold,
 			}
 
 			err := newRetentionExtender(opts).extend(ctx, tc.ov)

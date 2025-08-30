@@ -203,8 +203,8 @@ func cleanup(ctx context.Context, opts cleanupOptions) error {
 			state:        bucketState,
 			client:       opts.client,
 			dryRun:       opts.dryRun,
-			extendBy:     30 * 24 * time.Hour,
-			minRemaining: 14 * 24 * time.Hour,
+			minRetention: opts.minRetention,
+			threshold:    opts.minRetentionThreshold,
 		})
 
 		return e.run(ctx, extendCh)
