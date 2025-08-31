@@ -227,6 +227,23 @@ func TestVersionSeriesCheck(t *testing.T) {
 			wantExpired:    []string{"jan-1"},
 			wantKeep:       []string{"feb-1", "mar-1-del"},
 		},
+		{
+			name: "retention not yet expired",
+			versions: []objectVersion{
+				{
+					lastModified: time.Date(2004, time.January, 1, 0, 0, 0, 0, time.UTC),
+					versionID:    "jan-1",
+					retainUntil:  time.Date(2004, time.April, 1, 0, 0, 0, 0, time.UTC),
+				},
+				{
+					lastModified: time.Date(2004, time.February, 1, 0, 0, 0, 0, time.UTC),
+					versionID:    "feb-1",
+					isLatest:     true,
+				},
+			},
+			modifiedBefore: time.Date(2004, time.March, 28, 0, 0, 0, 0, time.UTC),
+			wantKeep:       []string{"jan-1", "feb-1"},
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			s := newVersionSeries(t.Name())

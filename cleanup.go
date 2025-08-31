@@ -65,7 +65,7 @@ func (s *versionSeries) check(modifiedBefore time.Time) (result versionSeriesRes
 			break
 		}
 
-		if i.lastModified.After(modifiedBefore) {
+		if i.lastModified.After(modifiedBefore) || (!i.retainUntil.IsZero() && i.retainUntil.After(modifiedBefore)) {
 			// Too recent.
 			break
 		}

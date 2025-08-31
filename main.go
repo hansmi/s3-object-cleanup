@@ -40,7 +40,7 @@ func (p *program) registerFlags() {
 
 	flag.DurationVar(&p.minAge, "min_age",
 		env.MustGetDuration("S3_OBJECT_CLEANUP_MIN_AGE", minAgeDaysDefault*24*time.Hour),
-		fmt.Sprintf("Minimum object version age. Defaults to $S3_OBJECT_CLEANUP_MIN_AGE or %d days.",
+		fmt.Sprintf("Minimum object version age before considering for deletion. Defaults to $S3_OBJECT_CLEANUP_MIN_AGE or %d days.",
 			minAgeDaysDefault))
 
 	flag.DurationVar(&p.minRetention, "min_retention",
