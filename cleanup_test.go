@@ -57,11 +57,11 @@ func TestVersionSeriesAdd(t *testing.T) {
 
 func TestVersionSeriesCheck(t *testing.T) {
 	for _, tc := range []struct {
-		name           string
-		versions       []objectVersion
-		modifiedBefore time.Time
-		wantExpired    []string
-		wantKeep       []string
+		name        string
+		versions    []objectVersion
+		minModTime  time.Time
+		wantExpired []string
+		wantKeep    []string
 	}{
 		{name: "empty"},
 		{
@@ -81,8 +81,8 @@ func TestVersionSeriesCheck(t *testing.T) {
 					deleteMarker: true,
 				},
 			},
-			modifiedBefore: time.Date(2002, time.January, 1, 0, 0, 0, 0, time.UTC),
-			wantKeep:       []string{"jan-1", "mar-1", "apr-1-del"},
+			minModTime: time.Date(2002, time.January, 1, 0, 0, 0, 0, time.UTC),
+			wantKeep:   []string{"jan-1", "mar-1", "apr-1-del"},
 		},
 		{
 			name: "one",
@@ -93,8 +93,8 @@ func TestVersionSeriesCheck(t *testing.T) {
 					isLatest:     true,
 				},
 			},
-			modifiedBefore: time.Date(2002, time.January, 1, 0, 0, 0, 0, time.UTC),
-			wantKeep:       []string{"jan-1"},
+			minModTime: time.Date(2002, time.January, 1, 0, 0, 0, 0, time.UTC),
+			wantKeep:   []string{"jan-1"},
 		},
 		{
 			name: "recent delete marker",
@@ -106,8 +106,8 @@ func TestVersionSeriesCheck(t *testing.T) {
 					deleteMarker: true,
 				},
 			},
-			modifiedBefore: time.Date(2001, time.January, 30, 0, 0, 0, 0, time.UTC),
-			wantKeep:       []string{"feb-1-del"},
+			minModTime: time.Date(2001, time.January, 30, 0, 0, 0, 0, time.UTC),
+			wantKeep:   []string{"feb-1-del"},
 		},
 		{
 			name: "expired delete marker",
@@ -119,8 +119,8 @@ func TestVersionSeriesCheck(t *testing.T) {
 					deleteMarker: true,
 				},
 			},
-			modifiedBefore: time.Date(2001, time.August, 1, 0, 0, 0, 0, time.UTC),
-			wantExpired:    []string{"feb-1-del"},
+			minModTime:  time.Date(2001, time.August, 1, 0, 0, 0, 0, time.UTC),
+			wantExpired: []string{"feb-1-del"},
 		},
 		{
 			name: "expired delete marker",
@@ -132,8 +132,8 @@ func TestVersionSeriesCheck(t *testing.T) {
 					isLatest:     true,
 				},
 			},
-			modifiedBefore: time.Date(2001, time.December, 1, 0, 0, 0, 0, time.UTC),
-			wantExpired:    []string{"jan-1-del"},
+			minModTime:  time.Date(2001, time.December, 1, 0, 0, 0, 0, time.UTC),
+			wantExpired: []string{"jan-1-del"},
 		},
 		{
 			name: "expired delete marker before latest",
@@ -149,9 +149,9 @@ func TestVersionSeriesCheck(t *testing.T) {
 					isLatest:     true,
 				},
 			},
-			modifiedBefore: time.Date(2002, time.December, 1, 0, 0, 0, 0, time.UTC),
-			wantExpired:    []string{"jan-1-del"},
-			wantKeep:       []string{"feb-1"},
+			minModTime:  time.Date(2002, time.December, 1, 0, 0, 0, 0, time.UTC),
+			wantExpired: []string{"jan-1-del"},
+			wantKeep:    []string{"feb-1"},
 		},
 		{
 			name: "version before recent delete marker",
@@ -167,8 +167,8 @@ func TestVersionSeriesCheck(t *testing.T) {
 					isLatest:     true,
 				},
 			},
-			modifiedBefore: time.Date(2003, time.January, 15, 0, 0, 0, 0, time.UTC),
-			wantKeep:       []string{"jan-1", "feb-1-del"},
+			minModTime: time.Date(2003, time.January, 15, 0, 0, 0, 0, time.UTC),
+			wantKeep:   []string{"jan-1", "feb-1-del"},
 		},
 		{
 			name: "version before expired delete marker",
@@ -184,8 +184,8 @@ func TestVersionSeriesCheck(t *testing.T) {
 					isLatest:     true,
 				},
 			},
-			modifiedBefore: time.Date(2004, time.June, 1, 0, 0, 0, 0, time.UTC),
-			wantExpired:    []string{"jan-1", "feb-1-del"},
+			minModTime:  time.Date(2004, time.June, 1, 0, 0, 0, 0, time.UTC),
+			wantExpired: []string{"jan-1", "feb-1-del"},
 		},
 		{
 			name: "two versions",
@@ -200,9 +200,9 @@ func TestVersionSeriesCheck(t *testing.T) {
 					isLatest:     true,
 				},
 			},
-			modifiedBefore: time.Date(2010, time.June, 1, 0, 0, 0, 0, time.UTC),
-			wantExpired:    []string{"jan-1"},
-			wantKeep:       []string{"feb-1"},
+			minModTime:  time.Date(2010, time.June, 1, 0, 0, 0, 0, time.UTC),
+			wantExpired: []string{"jan-1"},
+			wantKeep:    []string{"feb-1"},
 		},
 		{
 			name: "two versions and delete marker",
@@ -223,9 +223,9 @@ func TestVersionSeriesCheck(t *testing.T) {
 					isLatest:     true,
 				},
 			},
-			modifiedBefore: time.Date(2010, time.June, 1, 0, 0, 0, 0, time.UTC),
-			wantExpired:    []string{"jan-1"},
-			wantKeep:       []string{"feb-1", "mar-1-del"},
+			minModTime:  time.Date(2010, time.June, 1, 0, 0, 0, 0, time.UTC),
+			wantExpired: []string{"jan-1"},
+			wantKeep:    []string{"feb-1", "mar-1-del"},
 		},
 		{
 			name: "retention not yet expired",
@@ -241,8 +241,8 @@ func TestVersionSeriesCheck(t *testing.T) {
 					isLatest:     true,
 				},
 			},
-			modifiedBefore: time.Date(2004, time.March, 28, 0, 0, 0, 0, time.UTC),
-			wantKeep:       []string{"jan-1", "feb-1"},
+			minModTime: time.Date(2004, time.March, 28, 0, 0, 0, 0, time.UTC),
+			wantKeep:   []string{"jan-1", "feb-1"},
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -252,7 +252,7 @@ func TestVersionSeriesCheck(t *testing.T) {
 				s.add(i)
 			}
 
-			got := s.check(tc.modifiedBefore)
+			got := s.check(tc.minModTime)
 
 			extract := func(versions []objectVersion) (result []string) {
 				for _, i := range versions {

@@ -49,7 +49,7 @@ func (s *versionSeries) add(v objectVersion) {
 	s.items = slices.Insert(s.items, pos, v)
 }
 
-func (s *versionSeries) check(modifiedBefore time.Time) (result versionSeriesResult) {
+func (s *versionSeries) check(minModTime time.Time) (result versionSeriesResult) {
 	// Avoid making changes unless the latest version is known.
 	if !s.haveLatest {
 		result.keep = s.items
@@ -65,7 +65,7 @@ func (s *versionSeries) check(modifiedBefore time.Time) (result versionSeriesRes
 			break
 		}
 
-		if i.lastModified.After(modifiedBefore) || (!i.retainUntil.IsZero() && i.retainUntil.After(modifiedBefore)) {
+		if minModTime.Before(i.lastModified) || (!i.retainUntil.IsZero() && minModTime.Before(i.retainUntil)) {
 			// Too recent.
 			break
 		}
@@ -73,7 +73,7 @@ func (s *versionSeries) check(modifiedBefore time.Time) (result versionSeriesRes
 		if (idx+1) < len(s.items) && !i.deleteMarker {
 			// Keep last version before deletion until the delete marker
 			// expires.
-			if next := s.items[idx+1]; next.deleteMarker && next.lastModified.After(modifiedBefore) {
+			if next := s.items[idx+1]; next.deleteMarker && next.lastModified.After(minModTime) {
 				break
 			}
 		}
@@ -93,14 +93,14 @@ func (s *versionSeries) check(modifiedBefore time.Time) (result versionSeriesRes
 }
 
 type processor struct {
-	stats          *cleanupStats
-	modifiedBefore time.Time
+	stats      *cleanupStats
+	minModTime time.Time
 }
 
-func newProcessor(stats *cleanupStats, modifiedBefore time.Time) *processor {
+func newProcessor(stats *cleanupStats, minModTime time.Time) *processor {
 	return &processor{
-		stats:          stats,
-		modifiedBefore: modifiedBefore,
+		stats:      stats,
+		minModTime: minModTime,
 	}
 }
 
@@ -134,14 +134,14 @@ loop:
 
 		s.add(ov)
 
-		for _, i := range s.check(p.modifiedBefore).expired {
+		for _, i := range s.check(p.minModTime).expired {
 			// Early deletions
 			deleteCh <- i
 		}
 	}
 
 	for _, s := range objects {
-		checkResult := s.check(p.modifiedBefore)
+		checkResult := s.check(p.minModTime)
 
 		for _, i := range checkResult.expired {
 			deleteCh <- i
@@ -156,12 +156,12 @@ loop:
 }
 
 type cleanupOptions struct {
-	logger         *slog.Logger
-	stats          *cleanupStats
-	state          *state.Store
-	client         *client.Client
-	dryRun         bool
-	modifiedBefore time.Time
+	logger     *slog.Logger
+	stats      *cleanupStats
+	state      *state.Store
+	client     *client.Client
+	dryRun     bool
+	minModTime time.Time
 
 	minRetention          time.Duration
 	minRetentionThreshold time.Duration
@@ -195,7 +195,7 @@ func cleanup(ctx context.Context, opts cleanupOptions) error {
 		defer close(deleteCh)
 		defer close(extendCh)
 
-		p := newProcessor(opts.stats, opts.modifiedBefore)
+		p := newProcessor(opts.stats, opts.minModTime)
 
 		return p.run(ctx, handleCh, extendCh, deleteCh)
 	})
