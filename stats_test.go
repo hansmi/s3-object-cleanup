@@ -72,8 +72,9 @@ func TestStats(t *testing.T) {
 			ModTime   *timeRangeStructure `json:"mod_time"`
 		} `json:"total"`
 		Retention *struct {
-			Count   *int64              `json:"count"`
-			ModTime *timeRangeStructure `json:"mod_time"`
+			Count    *int64              `json:"count"`
+			ModTime  *timeRangeStructure `json:"mod_time"`
+			Original *timeRangeStructure `json:"original"`
 		} `json:"retention"`
 		Delete *struct {
 			Count        *int64              `json:"count"`
@@ -107,6 +108,10 @@ func TestStats(t *testing.T) {
 					"mod_time": {
 						"oldest": "0001-01-01T00:00:00Z",
 						"newest": "0001-01-01T00:00:00Z"
+					},
+					"original": {
+						"oldest": "0001-01-01T00:00:00Z",
+						"newest": "0001-01-01T00:00:00Z"
 					}
 				},
 				"delete": {
@@ -137,6 +142,7 @@ func TestStats(t *testing.T) {
 				})
 				s.addRetention(objectVersion{
 					lastModified: time.Date(2012, time.October, 1, 0, 0, 0, 0, time.UTC),
+					retainUntil:  time.Date(2019, time.January, 1, 0, 0, 0, 0, time.UTC),
 				})
 				s.addDelete(objectVersion{
 					size:         3 * 1024 * 1024,
@@ -159,6 +165,10 @@ func TestStats(t *testing.T) {
 					"mod_time": {
 						"oldest": "2012-10-01T00:00:00Z",
 						"newest": "2012-10-01T00:00:00Z"
+					},
+					"original": {
+						"oldest": "2019-01-01T00:00:00Z",
+						"newest": "2019-01-01T00:00:00Z"
 					}
 				},
 				"delete": {
