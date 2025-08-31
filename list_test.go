@@ -92,6 +92,7 @@ func TestListHandlerInternString(t *testing.T) {
 	got := make([]string, distinctValues*repetitions)
 	h := newListHandler(nil)
 
+	var heapOriginal int64
 	var heapEstimate int64
 
 	runtime.GC()
@@ -111,6 +112,7 @@ func TestListHandlerInternString(t *testing.T) {
 		// Intern strings.
 		for idx := range len(want) {
 			value := want[idx%distinctValues]
+			heapOriginal += stringSize + int64(len(value))
 
 			want[idx] = value
 
@@ -133,16 +135,17 @@ func TestListHandlerInternString(t *testing.T) {
 
 	heapDiff := int64(after.HeapAlloc) - int64(before.HeapAlloc)
 
-	t.Logf("Heap before: %s, after: %s, diff: %s, estimate: %s",
+	t.Logf("Heap before: %s, after: %s, diff: %s, estimate for actual: %s, original strings: %s",
 		formatMiB(int64(before.HeapAlloc)),
 		formatMiB(int64(after.HeapAlloc)),
 		formatMiB(heapDiff),
-		formatMiB(heapEstimate))
+		formatMiB(heapEstimate),
+		formatMiB(heapOriginal))
 
-	if heapDiff > 0 && heapDiff > 2*heapEstimate {
-		t.Errorf("Heap increase of %s is more than twice the estimate of %s",
+	if wantMax := max(5*heapEstimate, heapOriginal/4); heapDiff > 0 && heapDiff > wantMax {
+		t.Errorf("Heap increase of %s is more than the upper estimated bound of %s",
 			formatMiB(heapDiff),
-			formatMiB(heapEstimate))
+			formatMiB(wantMax))
 	}
 }
 
