@@ -202,6 +202,7 @@ func cleanup(ctx context.Context, opts cleanupOptions) error {
 	g.Go(func() error {
 		e := newRetentionExtender(retentionExtenderOptions{
 			logger:       opts.logger,
+			stats:        opts.stats,
 			state:        bucketState,
 			client:       opts.client,
 			dryRun:       opts.dryRun,

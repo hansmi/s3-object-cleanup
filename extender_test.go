@@ -95,6 +95,7 @@ func TestExtend(t *testing.T) {
 
 			opts := retentionExtenderOptions{
 				logger:       logger,
+				stats:        newCleanupStats(),
 				state:        state,
 				client:       &client,
 				now:          now,
@@ -137,6 +138,7 @@ func TestExtenderRun(t *testing.T) {
 
 	opts := retentionExtenderOptions{
 		logger: logger,
+		stats:  newCleanupStats(),
 		state:  state,
 		client: &client,
 	}

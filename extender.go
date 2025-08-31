@@ -19,6 +19,7 @@ type retentionExtenderClient interface {
 
 type retentionExtender struct {
 	logger *slog.Logger
+	stats  *cleanupStats
 	state  retentionExtenderState
 	client retentionExtenderClient
 
@@ -34,6 +35,7 @@ type retentionExtender struct {
 
 type retentionExtenderOptions struct {
 	logger *slog.Logger
+	stats  *cleanupStats
 	state  retentionExtenderState
 	client retentionExtenderClient
 	dryRun bool
@@ -56,6 +58,7 @@ func newRetentionExtender(opts retentionExtenderOptions) *retentionExtender {
 
 	return &retentionExtender{
 		logger:       opts.logger,
+		stats:        opts.stats,
 		state:        opts.state,
 		client:       opts.client,
 		dryRun:       opts.dryRun,
@@ -80,6 +83,8 @@ func (e *retentionExtender) extend(ctx context.Context, ov objectVersion) error 
 			slog.Any("object", ov),
 			slog.Time("until", until),
 		)
+
+		e.stats.addRetention(ov)
 
 		if !e.dryRun {
 			if err := e.client.PutObjectRetention(ctx, ov.key, ov.versionID, until); err != nil {

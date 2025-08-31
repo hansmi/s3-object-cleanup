@@ -71,13 +71,17 @@ func TestStats(t *testing.T) {
 			BytesText *string             `json:"bytes_text"`
 			ModTime   *timeRangeStructure `json:"mod_time"`
 		} `json:"total"`
+		Retention *struct {
+			Count   *int64              `json:"count"`
+			ModTime *timeRangeStructure `json:"mod_time"`
+		} `json:"retention"`
 		Delete *struct {
-			Count        *int64  `json:"count"`
-			Bytes        *int64  `json:"bytes"`
-			BytesText    *string `json:"bytes_text"`
-			SuccessCount *int64  `json:"success_count"`
-			ErrorCount   *int64  `json:"error_count"`
-			// ModTime   *timeRangeStructure `json:"mod_time"`
+			Count        *int64              `json:"count"`
+			Bytes        *int64              `json:"bytes"`
+			BytesText    *string             `json:"bytes_text"`
+			SuccessCount *int64              `json:"success_count"`
+			ErrorCount   *int64              `json:"error_count"`
+			ModTime      *timeRangeStructure `json:"mod_time"`
 		} `json:"delete"`
 	}
 
@@ -98,12 +102,23 @@ func TestStats(t *testing.T) {
 						"newest": "0001-01-01T00:00:00Z"
 					}
 				},
+				"retention": {
+					"count": 0,
+					"mod_time": {
+						"oldest": "0001-01-01T00:00:00Z",
+						"newest": "0001-01-01T00:00:00Z"
+					}
+				},
 				"delete": {
 					"count": 0,
 					"bytes": 0,
 					"bytes_text": "0 B",
 					"success_count": 0,
-					"error_count": 0
+					"error_count": 0,
+					"mod_time": {
+						"oldest": "0001-01-01T00:00:00Z",
+						"newest": "0001-01-01T00:00:00Z"
+					}
 				}
 			}`,
 		},
@@ -119,6 +134,9 @@ func TestStats(t *testing.T) {
 					size:         5 * 1024 * 1024,
 					lastModified: time.Date(2011, time.October, 1, 0, 0, 0, 0, time.UTC),
 					retainUntil:  time.Date(2019, time.January, 1, 0, 0, 0, 0, time.UTC),
+				})
+				s.addRetention(objectVersion{
+					lastModified: time.Date(2012, time.October, 1, 0, 0, 0, 0, time.UTC),
 				})
 				s.addDelete(objectVersion{
 					size:         3 * 1024 * 1024,
@@ -136,12 +154,23 @@ func TestStats(t *testing.T) {
 						"newest": "2015-01-01T00:00:00Z"
 					}
 				},
+				"retention": {
+					"count": 1,
+					"mod_time": {
+						"oldest": "2012-10-01T00:00:00Z",
+						"newest": "2012-10-01T00:00:00Z"
+					}
+				},
 				"delete": {
 					"count": 1,
 					"bytes": 3145728,
 					"bytes_text": "3.0 MiB",
 					"success_count": 10,
-					"error_count": 20
+					"error_count": 20,
+					"mod_time": {
+						"oldest": "2021-03-01T00:00:00Z",
+						"newest": "2021-03-01T00:00:00Z"
+					}
 				}
 			}`,
 		},
