@@ -104,24 +104,10 @@ func newProcessor(stats *cleanupStats, minModTime time.Time) *processor {
 	}
 }
 
-func (p *processor) run(ctx context.Context, in <-chan objectVersion, extendCh, deleteCh chan<- objectVersion) error {
+func (p *processor) run(in <-chan objectVersion, extendCh, deleteCh chan<- objectVersion) error {
 	objects := map[string]*versionSeries{}
 
-loop:
-	for {
-		var ov objectVersion
-		var ok bool
-
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-
-		case ov, ok = <-in:
-			if !ok {
-				break loop
-			}
-		}
-
+	for ov := range in {
 		p.stats.discovered(ov)
 
 		s := objects[ov.key]
@@ -197,7 +183,7 @@ func cleanup(ctx context.Context, opts cleanupOptions) error {
 
 		p := newProcessor(opts.stats, opts.minModTime)
 
-		return p.run(ctx, handleCh, extendCh, deleteCh)
+		return p.run(handleCh, extendCh, deleteCh)
 	})
 	g.Go(func() error {
 		e := newRetentionExtender(retentionExtenderOptions{

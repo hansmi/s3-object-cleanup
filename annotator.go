@@ -69,24 +69,16 @@ func (a *retentionAnnotator) run(ctx context.Context, in <-chan objectVersion, o
 
 	for range max(1, a.workers) {
 		g.Go(func() error {
-			for {
-				select {
-				case <-ctx.Done():
-					return ctx.Err()
-
-				case ov, ok := <-in:
-					if !ok {
-						return nil
-					}
-
-					ov, err := a.annotate(ctx, ov)
-					if err != nil {
-						return err
-					}
-
-					out <- ov
+			for ov := range in {
+				ov, err := a.annotate(ctx, ov)
+				if err != nil {
+					return err
 				}
+
+				out <- ov
 			}
+
+			return nil
 		})
 	}
 

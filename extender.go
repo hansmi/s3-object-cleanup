@@ -107,21 +107,13 @@ func (e *retentionExtender) run(ctx context.Context, in <-chan objectVersion) er
 
 	for range max(1, e.workers) {
 		g.Go(func() error {
-			for {
-				select {
-				case <-ctx.Done():
-					return ctx.Err()
-
-				case ov, ok := <-in:
-					if !ok {
-						return nil
-					}
-
-					if err := e.extend(ctx, ov); err != nil {
-						return err
-					}
+			for ov := range in {
+				if err := e.extend(ctx, ov); err != nil {
+					return err
 				}
 			}
+
+			return nil
 		})
 	}
 
