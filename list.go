@@ -56,7 +56,7 @@ func listObjectVersions(ctx context.Context, c s3.ListObjectVersionsAPIClient, b
 		Prefix: aws.String(prefix),
 	})
 
-	ch := make(chan *s3.ListObjectVersionsOutput)
+	ch := make(chan *s3.ListObjectVersionsOutput, 1)
 
 	g, ctx := errgroup.WithContext(ctx)
 	g.Go(func() error {

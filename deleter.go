@@ -99,7 +99,7 @@ loop:
 func (d *batchDeleter) run(ctx context.Context, in <-chan objectVersion) error {
 	g, ctx := errgroup.WithContext(ctx)
 
-	ch := make(chan []objectVersion)
+	ch := make(chan []objectVersion, 8)
 
 	for range max(1, d.workers) {
 		g.Go(func() error {
