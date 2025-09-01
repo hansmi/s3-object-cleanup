@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"log/slog"
-	"slices"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -12,10 +11,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-const (
-	batchSize           = 250
-	maxConcurrentDelete = 10
-)
+const batchSize = 250
 
 type batchDeleter struct {
 	logger     *slog.Logger
@@ -23,6 +19,7 @@ type batchDeleter struct {
 	dryRun     bool
 	client     *s3.Client
 	bucketName string
+	workers    int
 }
 
 func newBatchDeleter(logger *slog.Logger, stats *cleanupStats, c *client.Client, dryRun bool) *batchDeleter {
@@ -32,10 +29,11 @@ func newBatchDeleter(logger *slog.Logger, stats *cleanupStats, c *client.Client,
 		dryRun:     dryRun,
 		client:     c.S3(),
 		bucketName: c.Name(),
+		workers:    4,
 	}
 }
 
-func (d *batchDeleter) deleteBatch(ctx context.Context, logger *slog.Logger, items []objectVersion) error {
+func (d *batchDeleter) deleteBatch(ctx context.Context, items []objectVersion) error {
 	input := &s3.DeleteObjectsInput{
 		Bucket: aws.String(d.bucketName),
 		Delete: &types.Delete{},
@@ -44,7 +42,7 @@ func (d *batchDeleter) deleteBatch(ctx context.Context, logger *slog.Logger, ite
 	for _, i := range items {
 		input.Delete.Objects = append(input.Delete.Objects, i.identifier())
 
-		logger.InfoContext(ctx, "Delete",
+		d.logger.InfoContext(ctx, "Delete",
 			slog.Bool("dry_run", d.dryRun),
 			slog.Any("object", i),
 		)
@@ -61,7 +59,7 @@ func (d *batchDeleter) deleteBatch(ctx context.Context, logger *slog.Logger, ite
 		d.stats.addDeleteResults(len(output.Deleted), len(output.Errors))
 
 		for _, i := range output.Errors {
-			logger.ErrorContext(ctx, "Delete failed",
+			d.logger.ErrorContext(ctx, "Delete failed",
 				slog.String("key", aws.ToString(i.Key)),
 				slog.String("version", aws.ToString(i.VersionId)),
 				slog.String("code", aws.ToString(i.Code)),
@@ -73,55 +71,71 @@ func (d *batchDeleter) deleteBatch(ctx context.Context, logger *slog.Logger, ite
 	return nil
 }
 
-func (d *batchDeleter) run(ctx context.Context, ch <-chan objectVersion) error {
-	g, ctx := errgroup.WithContext(ctx)
-	g.SetLimit(1 + maxConcurrentDelete)
+func collectDeletes(ctx context.Context, ch <-chan objectVersion) ([]objectVersion, error) {
+	pending := make([]objectVersion, 0, batchSize)
 
-	var pending []objectVersion
-	var batchCount int
+loop:
+	for {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
 
-	send := func(ctx context.Context, flush bool) error {
-		for len(pending) > 0 {
-			if len(pending) < batchSize && !flush {
-				break
+		case obj, ok := <-ch:
+			if !ok {
+				break loop
 			}
 
-			batch := pending[:min(len(pending), batchSize)]
-			pending = slices.Clone(pending[len(batch):])
+			pending = append(pending, obj)
 
-			logger := d.logger.With("batch", batchCount)
-
-			g.Go(func() error {
-				return d.deleteBatch(ctx, logger, batch)
-			})
-
-			batchCount++
+			if len(pending) >= batchSize {
+				break loop
+			}
 		}
-
-		return nil
 	}
 
-	g.Go(func() (err error) {
-	loop:
-		for {
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
+	return pending, nil
+}
 
-			case obj, ok := <-ch:
-				if !ok {
-					break loop
-				}
+func (d *batchDeleter) run(ctx context.Context, in <-chan objectVersion) error {
+	g, ctx := errgroup.WithContext(ctx)
 
-				pending = append(pending, obj)
+	ch := make(chan []objectVersion)
 
-				if err := send(ctx, false); err != nil {
-					return err
+	for range max(1, d.workers) {
+		g.Go(func() error {
+			for {
+				select {
+				case <-ctx.Done():
+					return ctx.Err()
+
+				case items, ok := <-ch:
+					if !ok {
+						return nil
+					}
+
+					if err := d.deleteBatch(ctx, items); err != nil {
+						return err
+					}
 				}
 			}
-		}
+		})
+	}
 
-		return send(ctx, true)
+	g.Go(func() error {
+		defer close(ch)
+
+		for {
+			items, err := collectDeletes(ctx, in)
+			if err != nil {
+				return err
+			}
+
+			if len(items) == 0 {
+				return nil
+			}
+
+			ch <- items
+		}
 	})
 
 	return g.Wait()

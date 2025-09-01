@@ -35,7 +35,7 @@ func TestBatchDeleter(t *testing.T) {
 			versions: func() []objectVersion {
 				var result []objectVersion
 
-				for i := range (3 * batchSize * maxConcurrentDelete) + (batchSize / 3) {
+				for i := range (100 * batchSize) + (batchSize / 3) {
 					result = append(result, objectVersion{
 						key: strconv.Itoa(i),
 					})
