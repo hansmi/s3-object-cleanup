@@ -195,6 +195,8 @@ Flags:`)
 		logLevel.Set(slog.LevelDebug)
 	}
 
+	logBuildInfo(slog.Default())
+
 	buckets := strings.Fields(os.Getenv("S3_OBJECT_CLEANUP_BUCKETS"))
 	buckets = append(buckets, flag.Args()...)
 
