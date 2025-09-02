@@ -39,9 +39,10 @@ type cleanupStats struct {
 	totalModTime     timeRange
 	totalRetainUntil timeRange
 
-	retentionCount    int64
-	retentionModTime  timeRange
-	retentionOriginal timeRange
+	retentionSuccessCount int64
+	retentionErrorCount   int64
+	retentionModTime      timeRange
+	retentionOriginal     timeRange
 
 	deleteCount   int64
 	deleteBytes   int64
@@ -76,12 +77,19 @@ func (s *cleanupStats) addRetention(v objectVersion) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	s.retentionCount++
+	s.retentionSuccessCount++
 	s.retentionModTime.update(v.lastModified)
 
 	if !v.retainUntil.IsZero() {
 		s.retentionOriginal.update(v.retainUntil)
 	}
+}
+
+func (s *cleanupStats) addRetentionError() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.retentionErrorCount++
 }
 
 func (s *cleanupStats) addDelete(v objectVersion) {
@@ -116,7 +124,8 @@ func (s *cleanupStats) attrs() []any {
 			slog.Int64("error_count", s.retentionAnnotationErrorCount),
 		),
 		slog.Group("retention",
-			slog.Int64("count", s.retentionCount),
+			slog.Int64("success_count", s.retentionSuccessCount),
+			slog.Int64("error_count", s.retentionErrorCount),
 			slog.Group("mod_time", s.retentionModTime.attrs()...),
 			slog.Group("original", s.retentionOriginal.attrs()...),
 		),

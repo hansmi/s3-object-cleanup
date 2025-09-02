@@ -109,7 +109,11 @@ func (e *retentionExtender) run(ctx context.Context, in <-chan objectVersion) er
 		g.Go(func() error {
 			for ov := range in {
 				if err := e.extend(ctx, ov); err != nil {
-					return err
+					e.logger.Error("Retention extension failed",
+						slog.Any("object", ov),
+						slog.Any("error", err))
+					e.stats.addRetentionError()
+					continue
 				}
 			}
 

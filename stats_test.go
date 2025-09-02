@@ -75,9 +75,10 @@ func TestStats(t *testing.T) {
 			ErrorCount *int64 `json:"error_count"`
 		} `json:"retention_annotation"`
 		Retention *struct {
-			Count    *int64              `json:"count"`
-			ModTime  *timeRangeStructure `json:"mod_time"`
-			Original *timeRangeStructure `json:"original"`
+			SuccessCount *int64              `json:"success_count"`
+			ErrorCount   *int64              `json:"error_count"`
+			ModTime      *timeRangeStructure `json:"mod_time"`
+			Original     *timeRangeStructure `json:"original"`
 		} `json:"retention"`
 		Delete *struct {
 			Count        *int64              `json:"count"`
@@ -110,7 +111,8 @@ func TestStats(t *testing.T) {
 					"error_count": 0
 				},
 				"retention": {
-					"count": 0,
+					"success_count": 0,
+					"error_count": 0,
 					"mod_time": {
 						"oldest": "0001-01-01T00:00:00Z",
 						"newest": "0001-01-01T00:00:00Z"
@@ -170,7 +172,8 @@ func TestStats(t *testing.T) {
 					"error_count": 0
 				},
 				"retention": {
-					"count": 1,
+					"success_count": 1,
+					"error_count": 0,
 					"mod_time": {
 						"oldest": "2012-10-01T00:00:00Z",
 						"newest": "2012-10-01T00:00:00Z"
