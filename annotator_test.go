@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"log/slog"
 	"os"
 	"sort"
 	"strings"
@@ -12,7 +14,6 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/hansmi/s3-object-cleanup/internal/state"
 	"golang.org/x/sync/errgroup"
 )
@@ -51,7 +52,12 @@ func TestRetentionAnnotator(t *testing.T) {
 		until: want,
 	}
 
-	a := newRetentionAnnotator(newRetentionStateForTest(t), &client)
+	a := newRetentionAnnotator(retentionAnnotatorOptions{
+		logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
+		stats:  newCleanupStats(),
+		state:  newRetentionStateForTest(t),
+		client: &client,
+	})
 
 	for range 5 {
 		got, err := a.annotate(ctx, objectVersion{})
@@ -93,7 +99,12 @@ func TestRetentionAnnotatorRun(t *testing.T) {
 			until: time.Date(2003, time.June, 1, 2, 3, 0, 0, time.UTC),
 		}
 
-		a := newRetentionAnnotator(newRetentionStateForTest(t), &client)
+		a := newRetentionAnnotator(retentionAnnotatorOptions{
+			logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
+			stats:  newCleanupStats(),
+			state:  newRetentionStateForTest(t),
+			client: &client,
+		})
 
 		if err := a.run(ctx, in, out); err != nil {
 			t.Errorf("run() failed: %v", err)
@@ -169,15 +180,18 @@ func TestRetentionAnnotatorRunError(t *testing.T) {
 			err: errTest,
 		}
 
-		a := newRetentionAnnotator(newRetentionStateForTest(t), &client)
+		a := newRetentionAnnotator(retentionAnnotatorOptions{
+			logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
+			stats:  newCleanupStats(),
+			state:  newRetentionStateForTest(t),
+			client: &client,
+		})
 
 		ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 		t.Cleanup(cancel)
 
-		err := a.run(ctx, in, out)
-
-		if diff := cmp.Diff(errTest, err, cmpopts.EquateErrors()); diff != "" {
-			t.Errorf("Error diff (-want +got):\n%s", diff)
+		if err := a.run(ctx, in, out); err != nil {
+			t.Errorf("run() failed: %v", err)
 		}
 	}()
 

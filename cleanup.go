@@ -173,7 +173,12 @@ func cleanup(ctx context.Context, opts cleanupOptions) error {
 	g.Go(func() error {
 		defer close(handleCh)
 
-		a := newRetentionAnnotator(bucketState, opts.client)
+		a := newRetentionAnnotator(retentionAnnotatorOptions{
+			logger: opts.logger,
+			stats:  opts.stats,
+			state:  bucketState,
+			client: opts.client,
+		})
 
 		return a.run(ctx, annotateCh, handleCh)
 	})

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"golang.org/x/sync/errgroup"
@@ -17,17 +18,28 @@ type retentionAnnotatorClient interface {
 	GetObjectRetention(context.Context, string, string) (time.Time, error)
 }
 
+type retentionAnnotatorOptions struct {
+	logger *slog.Logger
+	stats  *cleanupStats
+	state  retentionAnnotatorState
+	client retentionAnnotatorClient
+}
+
 type retentionAnnotator struct {
+	logger *slog.Logger
+	stats  *cleanupStats
 	state  retentionAnnotatorState
 	client retentionAnnotatorClient
 
 	workers int
 }
 
-func newRetentionAnnotator(state retentionAnnotatorState, client retentionAnnotatorClient) *retentionAnnotator {
+func newRetentionAnnotator(opts retentionAnnotatorOptions) *retentionAnnotator {
 	return &retentionAnnotator{
-		state:  state,
-		client: client,
+		logger: opts.logger,
+		stats:  opts.stats,
+		state:  opts.state,
+		client: opts.client,
 
 		workers: 4,
 	}
@@ -72,7 +84,11 @@ func (a *retentionAnnotator) run(ctx context.Context, in <-chan objectVersion, o
 			for ov := range in {
 				ov, err := a.annotate(ctx, ov)
 				if err != nil {
-					return err
+					a.logger.Error("Retention annotation failed",
+						slog.Any("object", ov),
+						slog.Any("error", err))
+					a.stats.addRetentionAnnotationError()
+					continue
 				}
 
 				out <- ov

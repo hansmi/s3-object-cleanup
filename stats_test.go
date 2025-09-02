@@ -71,6 +71,9 @@ func TestStats(t *testing.T) {
 			BytesText *string             `json:"bytes_text"`
 			ModTime   *timeRangeStructure `json:"mod_time"`
 		} `json:"total"`
+		RetentionAnnotation *struct {
+			ErrorCount *int64 `json:"error_count"`
+		} `json:"retention_annotation"`
 		Retention *struct {
 			Count    *int64              `json:"count"`
 			ModTime  *timeRangeStructure `json:"mod_time"`
@@ -102,6 +105,9 @@ func TestStats(t *testing.T) {
 						"oldest": "0001-01-01T00:00:00Z",
 						"newest": "0001-01-01T00:00:00Z"
 					}
+				},
+				"retention_annotation": {
+					"error_count": 0
 				},
 				"retention": {
 					"count": 0,
@@ -159,6 +165,9 @@ func TestStats(t *testing.T) {
 						"oldest": "2011-10-01T00:00:00Z",
 						"newest": "2015-01-01T00:00:00Z"
 					}
+				},
+				"retention_annotation": {
+					"error_count": 0
 				},
 				"retention": {
 					"count": 1,

@@ -32,6 +32,8 @@ func (r *timeRange) attrs() []any {
 type cleanupStats struct {
 	mu sync.Mutex
 
+	retentionAnnotationErrorCount int64
+
 	totalCount       int64
 	totalBytes       int64
 	totalModTime     timeRange
@@ -51,6 +53,13 @@ type cleanupStats struct {
 
 func newCleanupStats() *cleanupStats {
 	return &cleanupStats{}
+}
+
+func (s *cleanupStats) addRetentionAnnotationError() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.retentionAnnotationErrorCount++
 }
 
 func (s *cleanupStats) discovered(v objectVersion) {
@@ -102,6 +111,9 @@ func (s *cleanupStats) attrs() []any {
 			slog.String("bytes_text", humanize.IBytes(uint64(s.totalBytes))),
 			slog.Group("mod_time", s.totalModTime.attrs()...),
 			slog.Group("retain_until", s.totalRetainUntil.attrs()...),
+		),
+		slog.Group("retention_annotation",
+			slog.Int64("error_count", s.retentionAnnotationErrorCount),
 		),
 		slog.Group("retention",
 			slog.Int64("count", s.retentionCount),
