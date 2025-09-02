@@ -173,7 +173,7 @@ func putObjectRetentionImpl(ctx context.Context, c putObjectRetentionClient, buc
 		Key:       aws.String(key),
 		VersionId: aws.String(versionID),
 		Retention: &types.ObjectLockRetention{
-			// TODO: ObjectLockRetentionMode may be required
+			Mode:            types.ObjectLockRetentionModeGovernance,
 			RetainUntilDate: aws.Time(until),
 		},
 	})
