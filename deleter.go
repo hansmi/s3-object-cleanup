@@ -71,7 +71,7 @@ func (d *batchDeleter) deleteBatch(ctx context.Context, items []objectVersion) e
 	return nil
 }
 
-func collectDeletes(ctx context.Context, ch <-chan objectVersion) ([]objectVersion, error) {
+func collectDeletes(ch <-chan objectVersion) []objectVersion {
 	pending := make([]objectVersion, 0, batchSize)
 
 	for ov := range ch {
@@ -82,7 +82,7 @@ func collectDeletes(ctx context.Context, ch <-chan objectVersion) ([]objectVersi
 		}
 	}
 
-	return pending, nil
+	return pending
 }
 
 func (d *batchDeleter) run(ctx context.Context, in <-chan objectVersion) error {
@@ -94,7 +94,9 @@ func (d *batchDeleter) run(ctx context.Context, in <-chan objectVersion) error {
 		g.Go(func() error {
 			for items := range ch {
 				if err := d.deleteBatch(ctx, items); err != nil {
-					return err
+					d.logger.Error("Batch deletion failed", slog.Any("error", err))
+					d.stats.addDeleteResults(0, 1)
+					continue
 				}
 			}
 
@@ -106,10 +108,7 @@ func (d *batchDeleter) run(ctx context.Context, in <-chan objectVersion) error {
 		defer close(ch)
 
 		for {
-			items, err := collectDeletes(ctx, in)
-			if err != nil {
-				return err
-			}
+			items := collectDeletes(in)
 
 			if len(items) == 0 {
 				return nil
