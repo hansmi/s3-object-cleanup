@@ -164,8 +164,7 @@ func cleanup(ctx context.Context, opts cleanupOptions) error {
 	extendCh := make(chan objectVersion, 8)
 	deleteCh := make(chan objectVersion, 8)
 
-	var g errgroup.Group
-
+	g, ctx := errgroup.WithContext(ctx)
 	g.Go(func() error {
 		defer close(annotateCh)
 
