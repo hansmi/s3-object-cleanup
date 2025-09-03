@@ -63,13 +63,17 @@ func TestStats(t *testing.T) {
 		Newest *time.Time `json:"newest"`
 	}
 
+	type sizeStatsStructure struct {
+		Bytes *int64  `json:"bytes"`
+		Text  *string `json:"text"`
+	}
+
 	// Missing attributes are detected via the use of pointers.
 	type structure struct {
 		Total *struct {
-			Count     *int64              `json:"count"`
-			Bytes     *int64              `json:"bytes"`
-			BytesText *string             `json:"bytes_text"`
-			ModTime   *timeRangeStructure `json:"mod_time"`
+			Count   *int64              `json:"count"`
+			Size    *sizeStatsStructure `json:"size"`
+			ModTime *timeRangeStructure `json:"mod_time"`
 		} `json:"total"`
 		RetentionAnnotation *struct {
 			ErrorCount *int64 `json:"error_count"`
@@ -82,8 +86,7 @@ func TestStats(t *testing.T) {
 		} `json:"retention"`
 		Delete *struct {
 			Count        *int64              `json:"count"`
-			Bytes        *int64              `json:"bytes"`
-			BytesText    *string             `json:"bytes_text"`
+			Size         *sizeStatsStructure `json:"size"`
 			SuccessCount *int64              `json:"success_count"`
 			ErrorCount   *int64              `json:"error_count"`
 			ModTime      *timeRangeStructure `json:"mod_time"`
@@ -100,8 +103,10 @@ func TestStats(t *testing.T) {
 			want: `{
 				"total": {
 					"count": 0,
-					"bytes": 0,
-					"bytes_text": "0 B",
+					"size": {
+						"bytes": 0,
+						"text": "0 B"
+					},
 					"mod_time": {
 						"oldest": "0001-01-01T00:00:00Z",
 						"newest": "0001-01-01T00:00:00Z"
@@ -124,8 +129,10 @@ func TestStats(t *testing.T) {
 				},
 				"delete": {
 					"count": 0,
-					"bytes": 0,
-					"bytes_text": "0 B",
+					"size": {
+						"bytes": 0,
+						"text": "0 B"
+					},
 					"success_count": 0,
 					"error_count": 0,
 					"mod_time": {
@@ -161,8 +168,10 @@ func TestStats(t *testing.T) {
 			want: `{
 				"total": {
 					"count": 2,
-					"bytes": 7340032,
-					"bytes_text": "7.0 MiB",
+					"size": {
+						"bytes": 7340032,
+						"text": "7.0 MiB"
+					},
 					"mod_time": {
 						"oldest": "2011-10-01T00:00:00Z",
 						"newest": "2015-01-01T00:00:00Z"
@@ -185,8 +194,10 @@ func TestStats(t *testing.T) {
 				},
 				"delete": {
 					"count": 1,
-					"bytes": 3145728,
-					"bytes_text": "3.0 MiB",
+					"size": {
+						"bytes": 3145728,
+						"text": "3.0 MiB"
+					},
 					"success_count": 10,
 					"error_count": 20,
 					"mod_time": {
