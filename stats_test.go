@@ -45,12 +45,12 @@ func TestTimeRange(t *testing.T) {
 				r.update(i)
 			}
 
-			want := []any{
+			want := slog.GroupValue(
 				slog.Time("oldest", tc.wantOldest),
 				slog.Time("newest", tc.wantNewest),
-			}
+			)
 
-			if diff := cmp.Diff(want, r.attrs()); diff != "" {
+			if diff := cmp.Diff(want, r.LogValue()); diff != "" {
 				t.Errorf("timeRange diff (-want +got):\n%s", diff)
 			}
 		})

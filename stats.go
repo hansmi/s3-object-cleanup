@@ -12,6 +12,8 @@ type timeRange struct {
 	oldest, newest time.Time
 }
 
+var _ slog.LogValuer = (*timeRange)(nil)
+
 func (r *timeRange) update(t time.Time) {
 	if r.oldest.IsZero() || t.Before(r.oldest) {
 		r.oldest = t
@@ -22,24 +24,26 @@ func (r *timeRange) update(t time.Time) {
 	}
 }
 
-func (r *timeRange) attrs() []any {
-	return []any{
+func (r timeRange) LogValue() slog.Value {
+	return slog.GroupValue(
 		slog.Time("oldest", r.oldest),
 		slog.Time("newest", r.newest),
-	}
+	)
 }
 
 type sizeStats int64
+
+var _ slog.LogValuer = (*sizeStats)(nil)
 
 func (s *sizeStats) add(bytes int64) {
 	*(*int64)(s) += bytes
 }
 
-func (s sizeStats) attrs() []any {
-	return []any{
+func (s sizeStats) LogValue() slog.Value {
+	return slog.GroupValue(
 		slog.Int64("bytes", int64(s)),
 		slog.String("text", humanize.IBytes(uint64(s))),
-	}
+	)
 }
 
 type cleanupStats struct {
@@ -128,9 +132,9 @@ func (s *cleanupStats) attrs() []any {
 	return []any{
 		slog.Group("total",
 			slog.Int64("count", s.totalCount),
-			slog.Group("size", s.totalSize.attrs()...),
-			slog.Group("mod_time", s.totalModTime.attrs()...),
-			slog.Group("retain_until", s.totalRetainUntil.attrs()...),
+			slog.Any("size", s.totalSize),
+			slog.Any("mod_time", s.totalModTime),
+			slog.Any("retain_until", s.totalRetainUntil),
 		),
 		slog.Group("retention_annotation",
 			slog.Int64("error_count", s.retentionAnnotationErrorCount),
@@ -138,13 +142,13 @@ func (s *cleanupStats) attrs() []any {
 		slog.Group("retention",
 			slog.Int64("success_count", s.retentionSuccessCount),
 			slog.Int64("error_count", s.retentionErrorCount),
-			slog.Group("mod_time", s.retentionModTime.attrs()...),
-			slog.Group("original", s.retentionOriginal.attrs()...),
+			slog.Any("mod_time", s.retentionModTime),
+			slog.Any("original", s.retentionOriginal),
 		),
 		slog.Group("delete",
 			slog.Int64("count", s.deleteCount),
-			slog.Group("size", s.deleteSize.attrs()...),
-			slog.Group("mod_time", s.deleteModTime.attrs()...),
+			slog.Any("size", s.deleteSize),
+			slog.Any("mod_time", s.deleteModTime),
 			slog.Int64("success_count", s.deleteSuccessCount),
 			slog.Int64("error_count", s.deleteErrorCount),
 		),
