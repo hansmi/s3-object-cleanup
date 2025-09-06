@@ -168,7 +168,7 @@ func TestVersionSeriesCheck(t *testing.T) {
 				},
 			},
 			cutoff:     time.Date(2003, time.January, 15, 0, 0, 0, 0, time.UTC),
-			wantExtend: []string{"jan-1", "feb-1-del"},
+			wantExtend: []string{"feb-1-del"},
 		},
 		{
 			name: "version before expired delete marker",
@@ -247,7 +247,7 @@ func TestVersionSeriesCheck(t *testing.T) {
 			},
 			cutoff:      time.Date(2004, time.February, 25, 0, 0, 0, 0, time.UTC),
 			wantExpired: []string{"jan-1"},
-			wantExtend:  []string{"feb-1", "mar-1-del"},
+			wantExtend:  []string{"mar-1-del"},
 		},
 		{
 			name: "retention not yet expired",

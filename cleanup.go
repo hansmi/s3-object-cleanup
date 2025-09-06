@@ -65,6 +65,7 @@ func (s *versionSeries) check(cutoff time.Time) (result versionSeriesResult) {
 	}
 
 	end := -1
+	skip := 0
 
 	// Find most recent version to delete.
 	for idx, i := range s.items {
@@ -82,6 +83,7 @@ func (s *versionSeries) check(cutoff time.Time) (result versionSeriesResult) {
 			// Keep last version before deletion until the delete marker
 			// expires.
 			if next := s.items[idx+1]; next.deleteMarker && recent(next) {
+				skip = 1
 				break
 			}
 		}
@@ -95,7 +97,7 @@ func (s *versionSeries) check(cutoff time.Time) (result versionSeriesResult) {
 		s.items = slices.Replace(s.items, 0, end+1)
 	}
 
-	result.extend = s.items
+	result.extend = s.items[skip:len(s.items)]
 
 	return result
 }
