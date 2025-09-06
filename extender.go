@@ -76,7 +76,7 @@ func (e *retentionExtender) extend(ctx context.Context, ov objectVersion) error 
 		return nil
 	}
 
-	until := e.now.Add(e.minRetention)
+	until := e.now.Add(e.minRetention).Truncate(time.Second)
 
 	if ov.retainUntil.IsZero() || (until.After(ov.retainUntil) && ov.retainUntil.Sub(e.now) < e.threshold) {
 		e.logger.InfoContext(ctx, "Extending object retention",
