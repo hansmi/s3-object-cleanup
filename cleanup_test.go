@@ -214,7 +214,6 @@ func TestVersionSeriesCheck(t *testing.T) {
 				{
 					lastModified: time.Date(2004, time.February, 1, 0, 0, 0, 0, time.UTC),
 					versionID:    "feb-1",
-					isLatest:     true,
 				},
 				{
 					lastModified: time.Date(2004, time.March, 1, 0, 0, 0, 0, time.UTC),
@@ -223,7 +222,30 @@ func TestVersionSeriesCheck(t *testing.T) {
 					isLatest:     true,
 				},
 			},
-			minModTime:  time.Date(2010, time.June, 1, 0, 0, 0, 0, time.UTC),
+			minModTime:  time.Date(2004, time.June, 1, 0, 0, 0, 0, time.UTC),
+			wantExpired: []string{"jan-1", "feb-1", "mar-1-del"},
+		},
+		{
+			name: "two versions with retention and delete marker",
+			versions: []objectVersion{
+				{
+					lastModified: time.Date(2004, time.January, 1, 0, 0, 0, 0, time.UTC),
+					versionID:    "jan-1",
+					retainUntil:  time.Date(2004, time.January, 15, 0, 0, 0, 0, time.UTC),
+				},
+				{
+					lastModified: time.Date(2004, time.February, 1, 0, 0, 0, 0, time.UTC),
+					versionID:    "feb-1",
+					retainUntil:  time.Date(2004, time.February, 15, 0, 0, 0, 0, time.UTC),
+				},
+				{
+					lastModified: time.Date(2004, time.March, 1, 0, 0, 0, 0, time.UTC),
+					versionID:    "mar-1-del",
+					deleteMarker: true,
+					isLatest:     true,
+				},
+			},
+			minModTime:  time.Date(2004, time.February, 25, 0, 0, 0, 0, time.UTC),
 			wantExpired: []string{"jan-1"},
 			wantKeep:    []string{"feb-1", "mar-1-del"},
 		},

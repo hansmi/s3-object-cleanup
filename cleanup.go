@@ -56,6 +56,14 @@ func (s *versionSeries) check(minModTime time.Time) (result versionSeriesResult)
 		return
 	}
 
+	recent := func(ov objectVersion) bool {
+		if !ov.retainUntil.IsZero() && minModTime.Before(ov.retainUntil) {
+			return true
+		}
+
+		return minModTime.Before(ov.lastModified)
+	}
+
 	end := -1
 
 	// Find most recent version to delete.
@@ -65,7 +73,7 @@ func (s *versionSeries) check(minModTime time.Time) (result versionSeriesResult)
 			break
 		}
 
-		if minModTime.Before(i.lastModified) || (!i.retainUntil.IsZero() && minModTime.Before(i.retainUntil)) {
+		if recent(i) {
 			// Too recent.
 			break
 		}
@@ -73,7 +81,7 @@ func (s *versionSeries) check(minModTime time.Time) (result versionSeriesResult)
 		if (idx+1) < len(s.items) && !i.deleteMarker {
 			// Keep last version before deletion until the delete marker
 			// expires.
-			if next := s.items[idx+1]; next.deleteMarker && next.lastModified.After(minModTime) {
+			if next := s.items[idx+1]; next.deleteMarker && recent(next) {
 				break
 			}
 		}
