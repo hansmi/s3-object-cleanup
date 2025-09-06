@@ -266,6 +266,24 @@ func TestVersionSeriesCheck(t *testing.T) {
 			cutoff:     time.Date(2004, time.March, 28, 0, 0, 0, 0, time.UTC),
 			wantExtend: []string{"jan-1", "feb-1"},
 		},
+		{
+			name: "version after delete marker",
+			versions: []objectVersion{
+				{
+					lastModified: time.Date(2004, time.January, 1, 0, 0, 0, 0, time.UTC),
+					versionID:    "jan-1-del",
+					deleteMarker: true,
+				},
+				{
+					lastModified: time.Date(2004, time.February, 1, 0, 0, 0, 0, time.UTC),
+					versionID:    "feb-1",
+					isLatest:     true,
+				},
+			},
+			cutoff:      time.Date(2004, time.March, 28, 0, 0, 0, 0, time.UTC),
+			wantExpired: []string{"jan-1-del"},
+			wantExtend:  []string{"feb-1"},
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			s := newVersionSeries(t.Name())
