@@ -15,7 +15,7 @@ import (
 
 type versionSeriesResult struct {
 	expired []objectVersion
-	keep    []objectVersion
+	extend  []objectVersion
 }
 
 type versionSeries struct {
@@ -52,7 +52,7 @@ func (s *versionSeries) add(v objectVersion) {
 func (s *versionSeries) check(cutoff time.Time) (result versionSeriesResult) {
 	// Avoid making changes unless the latest version is known.
 	if !s.haveLatest {
-		result.keep = s.items
+		result.extend = s.items
 		return
 	}
 
@@ -95,7 +95,7 @@ func (s *versionSeries) check(cutoff time.Time) (result versionSeriesResult) {
 		s.items = slices.Replace(s.items, 0, end+1)
 	}
 
-	result.keep = s.items
+	result.extend = s.items
 
 	return result
 }
@@ -141,7 +141,7 @@ func (p *processor) run(in <-chan objectVersion, extendCh, deleteCh chan<- objec
 			deleteCh <- i
 		}
 
-		for _, i := range checkResult.keep {
+		for _, i := range checkResult.extend {
 			extendCh <- i
 		}
 	}

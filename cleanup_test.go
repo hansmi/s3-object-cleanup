@@ -61,7 +61,7 @@ func TestVersionSeriesCheck(t *testing.T) {
 		versions    []objectVersion
 		cutoff      time.Time
 		wantExpired []string
-		wantKeep    []string
+		wantExtend  []string
 	}{
 		{name: "empty"},
 		{
@@ -81,8 +81,8 @@ func TestVersionSeriesCheck(t *testing.T) {
 					deleteMarker: true,
 				},
 			},
-			cutoff:   time.Date(2002, time.January, 1, 0, 0, 0, 0, time.UTC),
-			wantKeep: []string{"jan-1", "mar-1", "apr-1-del"},
+			cutoff:     time.Date(2002, time.January, 1, 0, 0, 0, 0, time.UTC),
+			wantExtend: []string{"jan-1", "mar-1", "apr-1-del"},
 		},
 		{
 			name: "one",
@@ -93,8 +93,8 @@ func TestVersionSeriesCheck(t *testing.T) {
 					isLatest:     true,
 				},
 			},
-			cutoff:   time.Date(2002, time.January, 1, 0, 0, 0, 0, time.UTC),
-			wantKeep: []string{"jan-1"},
+			cutoff:     time.Date(2002, time.January, 1, 0, 0, 0, 0, time.UTC),
+			wantExtend: []string{"jan-1"},
 		},
 		{
 			name: "recent delete marker",
@@ -106,8 +106,8 @@ func TestVersionSeriesCheck(t *testing.T) {
 					deleteMarker: true,
 				},
 			},
-			cutoff:   time.Date(2001, time.January, 30, 0, 0, 0, 0, time.UTC),
-			wantKeep: []string{"feb-1-del"},
+			cutoff:     time.Date(2001, time.January, 30, 0, 0, 0, 0, time.UTC),
+			wantExtend: []string{"feb-1-del"},
 		},
 		{
 			name: "expired delete marker",
@@ -151,7 +151,7 @@ func TestVersionSeriesCheck(t *testing.T) {
 			},
 			cutoff:      time.Date(2002, time.December, 1, 0, 0, 0, 0, time.UTC),
 			wantExpired: []string{"jan-1-del"},
-			wantKeep:    []string{"feb-1"},
+			wantExtend:  []string{"feb-1"},
 		},
 		{
 			name: "version before recent delete marker",
@@ -167,8 +167,8 @@ func TestVersionSeriesCheck(t *testing.T) {
 					isLatest:     true,
 				},
 			},
-			cutoff:   time.Date(2003, time.January, 15, 0, 0, 0, 0, time.UTC),
-			wantKeep: []string{"jan-1", "feb-1-del"},
+			cutoff:     time.Date(2003, time.January, 15, 0, 0, 0, 0, time.UTC),
+			wantExtend: []string{"jan-1", "feb-1-del"},
 		},
 		{
 			name: "version before expired delete marker",
@@ -202,7 +202,7 @@ func TestVersionSeriesCheck(t *testing.T) {
 			},
 			cutoff:      time.Date(2010, time.June, 1, 0, 0, 0, 0, time.UTC),
 			wantExpired: []string{"jan-1"},
-			wantKeep:    []string{"feb-1"},
+			wantExtend:  []string{"feb-1"},
 		},
 		{
 			name: "two versions and delete marker",
@@ -247,7 +247,7 @@ func TestVersionSeriesCheck(t *testing.T) {
 			},
 			cutoff:      time.Date(2004, time.February, 25, 0, 0, 0, 0, time.UTC),
 			wantExpired: []string{"jan-1"},
-			wantKeep:    []string{"feb-1", "mar-1-del"},
+			wantExtend:  []string{"feb-1", "mar-1-del"},
 		},
 		{
 			name: "retention not yet expired",
@@ -263,8 +263,8 @@ func TestVersionSeriesCheck(t *testing.T) {
 					isLatest:     true,
 				},
 			},
-			cutoff:   time.Date(2004, time.March, 28, 0, 0, 0, 0, time.UTC),
-			wantKeep: []string{"jan-1", "feb-1"},
+			cutoff:     time.Date(2004, time.March, 28, 0, 0, 0, 0, time.UTC),
+			wantExtend: []string{"jan-1", "feb-1"},
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -284,14 +284,14 @@ func TestVersionSeriesCheck(t *testing.T) {
 			}
 
 			gotExpired := extract(got.expired)
-			gotKeep := extract(got.keep)
+			gotExtend := extract(got.extend)
 
 			if diff := cmp.Diff(tc.wantExpired, gotExpired, cmpopts.EquateEmpty()); diff != "" {
 				t.Errorf("Expired versions diff (-want +got):\n%s", diff)
 			}
 
-			if diff := cmp.Diff(tc.wantKeep, gotKeep, cmpopts.EquateEmpty()); diff != "" {
-				t.Errorf("Keep versions diff (-want +got):\n%s", diff)
+			if diff := cmp.Diff(tc.wantExtend, gotExtend, cmpopts.EquateEmpty()); diff != "" {
+				t.Errorf("Extend versions diff (-want +got):\n%s", diff)
 			}
 		})
 	}
