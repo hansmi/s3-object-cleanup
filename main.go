@@ -131,8 +131,6 @@ func (p *program) run(ctx context.Context, bucketNames []string) (err error) {
 		slog.InfoContext(ctx, "Statistics", stats.attrs()...)
 	}()
 
-	minModTime := time.Now().Add(-p.minAge).Truncate(time.Minute)
-
 	var bucketErrors []error
 
 	for _, c := range clients {
@@ -144,7 +142,7 @@ func (p *program) run(ctx context.Context, bucketNames []string) (err error) {
 			state:                 s,
 			client:                c,
 			dryRun:                p.dryRun,
-			minModTime:            minModTime,
+			minAge:                p.minAge,
 			minRetention:          p.minRetention,
 			minRetentionThreshold: p.minRetentionThreshold,
 		}); err != nil {

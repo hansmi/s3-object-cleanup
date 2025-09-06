@@ -49,7 +49,7 @@ func (s *versionSeries) add(v objectVersion) {
 	s.items = slices.Insert(s.items, pos, v)
 }
 
-func (s *versionSeries) check(minModTime time.Time) (result versionSeriesResult) {
+func (s *versionSeries) check(cutoff time.Time) (result versionSeriesResult) {
 	// Avoid making changes unless the latest version is known.
 	if !s.haveLatest {
 		result.keep = s.items
@@ -57,11 +57,11 @@ func (s *versionSeries) check(minModTime time.Time) (result versionSeriesResult)
 	}
 
 	recent := func(ov objectVersion) bool {
-		if !ov.retainUntil.IsZero() && minModTime.Before(ov.retainUntil) {
+		if !ov.retainUntil.IsZero() && cutoff.Before(ov.retainUntil) {
 			return true
 		}
 
-		return minModTime.Before(ov.lastModified)
+		return cutoff.Before(ov.lastModified)
 	}
 
 	end := -1
@@ -101,14 +101,14 @@ func (s *versionSeries) check(minModTime time.Time) (result versionSeriesResult)
 }
 
 type processor struct {
-	stats      *cleanupStats
-	minModTime time.Time
+	stats  *cleanupStats
+	cutoff time.Time
 }
 
-func newProcessor(stats *cleanupStats, minModTime time.Time) *processor {
+func newProcessor(stats *cleanupStats, minAge time.Duration) *processor {
 	return &processor{
-		stats:      stats,
-		minModTime: minModTime,
+		stats:  stats,
+		cutoff: time.Now().Add(-minAge).Truncate(time.Minute),
 	}
 }
 
@@ -128,14 +128,14 @@ func (p *processor) run(in <-chan objectVersion, extendCh, deleteCh chan<- objec
 
 		s.add(ov)
 
-		for _, i := range s.check(p.minModTime).expired {
+		for _, i := range s.check(p.cutoff).expired {
 			// Early deletions
 			deleteCh <- i
 		}
 	}
 
 	for _, s := range objects {
-		checkResult := s.check(p.minModTime)
+		checkResult := s.check(p.cutoff)
 
 		for _, i := range checkResult.expired {
 			deleteCh <- i
@@ -150,13 +150,13 @@ func (p *processor) run(in <-chan objectVersion, extendCh, deleteCh chan<- objec
 }
 
 type cleanupOptions struct {
-	logger     *slog.Logger
-	stats      *cleanupStats
-	state      *state.Store
-	client     *client.Client
-	dryRun     bool
-	minModTime time.Time
+	logger *slog.Logger
+	stats  *cleanupStats
+	state  *state.Store
+	client *client.Client
+	dryRun bool
 
+	minAge                time.Duration
 	minRetention          time.Duration
 	minRetentionThreshold time.Duration
 }
@@ -194,7 +194,7 @@ func cleanup(ctx context.Context, opts cleanupOptions) error {
 		defer close(deleteCh)
 		defer close(extendCh)
 
-		p := newProcessor(opts.stats, opts.minModTime)
+		p := newProcessor(opts.stats, opts.minAge)
 
 		return p.run(handleCh, extendCh, deleteCh)
 	})
