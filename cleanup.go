@@ -13,6 +13,34 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+func findFirstExtended(versions []objectVersion, recent func(objectVersion) bool) int {
+	for idx, ov := range slices.Backward(versions) {
+		if !ov.isLatest {
+			continue
+		}
+
+		if !ov.deleteMarker {
+			return idx
+		}
+
+		if recent(ov) {
+			// Walk backwards to find a regular version preceding the delete
+			// marker.
+			for i := idx - 1; i >= 0; i-- {
+				if !versions[i].deleteMarker {
+					return i
+				}
+			}
+
+			return idx
+		}
+
+		break
+	}
+
+	return -1
+}
+
 type versionSeriesResult struct {
 	expired []objectVersion
 	extend  []objectVersion
@@ -64,42 +92,26 @@ func (s *versionSeries) check(cutoff time.Time) (result versionSeriesResult) {
 		return cutoff.Before(ov.lastModified)
 	}
 
-	end := -1
-	skip := 0
+	earlier := s.items
 
-	// Find most recent version to delete.
-	for idx, i := range s.items {
-		if i.isLatest && !i.deleteMarker {
-			// Ignore latest version and anything newer.
-			break
-		}
-
-		if recent(i) {
-			// Too recent.
-			break
-		}
-
-		if (idx+1) < len(s.items) && !i.deleteMarker {
-			// Keep last version before deletion until the delete marker
-			// expires.
-			if next := s.items[idx+1]; next.deleteMarker && recent(next) {
-				skip = 1
-				break
-			}
-		}
-
-		end = idx
+	if firstExtended := findFirstExtended(s.items, recent); firstExtended >= 0 {
+		result.extend = slices.Clone(s.items[firstExtended:])
+		earlier = s.items[:firstExtended]
 	}
 
-	if end >= 0 {
-		result.expired = slices.Clone(s.items[:end+1])
+	firstKept := 0
 
-		s.items = slices.Replace(s.items, 0, end+1)
+	for ; firstKept < len(earlier) && !recent(earlier[firstKept]); firstKept++ {
 	}
 
-	result.extend = s.items[skip:len(s.items)]
+	if firstKept > 0 {
+		result.expired = slices.Clone(s.items[:firstKept])
 
-	return result
+		// Remove expired versions.
+		s.items = slices.Replace(s.items, 0, firstKept)
+	}
+
+	return
 }
 
 type processor struct {

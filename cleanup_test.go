@@ -12,6 +12,106 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 )
 
+func TestFindFirstExtended(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		cutoff   time.Time
+		versions []objectVersion
+		want     int
+	}{
+		{
+			name: "empty",
+			want: -1,
+		},
+		{
+			name: "regular",
+			versions: []objectVersion{
+				{
+					lastModified: time.Date(2001, time.January, 1, 0, 0, 0, 0, time.UTC),
+					isLatest:     true,
+				},
+			},
+		},
+		{
+			name: "regular multiple",
+			versions: []objectVersion{
+				{lastModified: time.Date(2001, time.January, 1, 0, 0, 0, 0, time.UTC)},
+				{lastModified: time.Date(2001, time.February, 1, 0, 0, 0, 0, time.UTC)},
+				{
+					lastModified: time.Date(2001, time.March, 1, 0, 0, 0, 0, time.UTC),
+					isLatest:     true,
+				},
+			},
+			want: 2,
+		},
+		{
+			name:   "regular multiple with delete marker",
+			cutoff: time.Date(2001, time.February, 20, 0, 0, 0, 0, time.UTC),
+			versions: []objectVersion{
+				{lastModified: time.Date(2001, time.January, 1, 0, 0, 0, 0, time.UTC)},
+				{lastModified: time.Date(2001, time.February, 1, 0, 0, 0, 0, time.UTC)},
+				{
+					lastModified: time.Date(2001, time.March, 1, 0, 0, 0, 0, time.UTC),
+					deleteMarker: true,
+					isLatest:     true,
+				},
+			},
+			want: 1,
+		},
+		{
+			name:   "regular multiple with expired delete marker",
+			cutoff: time.Date(2003, time.January, 1, 0, 0, 0, 0, time.UTC),
+			versions: []objectVersion{
+				{lastModified: time.Date(2001, time.January, 1, 0, 0, 0, 0, time.UTC)},
+				{lastModified: time.Date(2001, time.February, 1, 0, 0, 0, 0, time.UTC)},
+				{
+					lastModified: time.Date(2001, time.March, 1, 0, 0, 0, 0, time.UTC),
+					deleteMarker: true,
+					isLatest:     true,
+				},
+			},
+			want: -1,
+		},
+		{
+			name:   "delete marker",
+			cutoff: time.Date(2000, time.January, 1, 0, 0, 0, 0, time.UTC),
+			versions: []objectVersion{
+				{
+					lastModified: time.Date(2001, time.January, 1, 0, 0, 0, 0, time.UTC),
+					deleteMarker: true,
+					isLatest:     true,
+				},
+			},
+		},
+		{
+			name:   "expired delete marker",
+			cutoff: time.Date(2003, time.January, 1, 0, 0, 0, 0, time.UTC),
+			versions: []objectVersion{
+				{
+					lastModified: time.Date(2001, time.January, 1, 0, 0, 0, 0, time.UTC),
+					deleteMarker: true,
+					isLatest:     true,
+				},
+			},
+			want: -1,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := findFirstExtended(tc.versions, func(ov objectVersion) bool {
+				if tc.cutoff.IsZero() {
+					t.Fatalf("cutoff is not set")
+				}
+
+				return tc.cutoff.Before(ov.lastModified)
+			})
+
+			if diff := cmp.Diff(tc.want, got); diff != "" {
+				t.Errorf("findFirstExtended() diff (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
 func TestVersionSeriesAdd(t *testing.T) {
 	want := []objectVersion{
 		{
@@ -124,19 +224,6 @@ func TestVersionSeriesCheck(t *testing.T) {
 			wantExpired: []string{"feb-1-del"},
 		},
 		{
-			name: "expired delete marker",
-			versions: []objectVersion{
-				{
-					lastModified: time.Date(2001, time.January, 1, 0, 0, 0, 0, time.UTC),
-					versionID:    "jan-1-del",
-					deleteMarker: true,
-					isLatest:     true,
-				},
-			},
-			cutoff:      time.Date(2001, time.December, 1, 0, 0, 0, 0, time.UTC),
-			wantExpired: []string{"jan-1-del"},
-		},
-		{
 			name: "expired delete marker before latest",
 			versions: []objectVersion{
 				{
@@ -169,7 +256,7 @@ func TestVersionSeriesCheck(t *testing.T) {
 				},
 			},
 			cutoff:     time.Date(2003, time.January, 15, 0, 0, 0, 0, time.UTC),
-			wantExtend: []string{"feb-1-del"},
+			wantExtend: []string{"jan-1", "feb-1-del"},
 		},
 		{
 			name: "version before expired delete marker",
@@ -248,7 +335,7 @@ func TestVersionSeriesCheck(t *testing.T) {
 			},
 			cutoff:      time.Date(2004, time.February, 25, 0, 0, 0, 0, time.UTC),
 			wantExpired: []string{"jan-1"},
-			wantExtend:  []string{"mar-1-del"},
+			wantExtend:  []string{"feb-1", "mar-1-del"},
 		},
 		{
 			name: "retention not yet expired",
@@ -265,7 +352,7 @@ func TestVersionSeriesCheck(t *testing.T) {
 				},
 			},
 			cutoff:     time.Date(2004, time.March, 28, 0, 0, 0, 0, time.UTC),
-			wantExtend: []string{"jan-1", "feb-1"},
+			wantExtend: []string{"feb-1"},
 		},
 		{
 			name: "version after delete marker",
