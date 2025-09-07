@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	set "github.com/deckarep/golang-set/v2"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 )
@@ -303,6 +304,10 @@ func TestVersionSeriesCheck(t *testing.T) {
 
 			gotExpired := extract(got.expired)
 			gotExtend := extract(got.extend)
+
+			if got := set.NewSet(gotExpired...).Intersect(set.NewSet(gotExtend...)); !got.IsEmpty() {
+				t.Errorf("Expired and extended versions intersect: %q", set.Sorted(got))
+			}
 
 			if diff := cmp.Diff(tc.wantExpired, gotExpired, cmpopts.EquateEmpty()); diff != "" {
 				t.Errorf("Expired versions diff (-want +got):\n%s", diff)
