@@ -1,6 +1,6 @@
 module github.com/hansmi/s3-object-cleanup
 
-go 1.23.5
+go 1.24.0
 
 require (
 	github.com/aws/aws-sdk-go-v2 v1.38.3
@@ -12,7 +12,7 @@ require (
 	github.com/google/go-cmp v0.7.0
 	github.com/timshannon/bolthold v0.0.0-20240314194003-30aac6950928
 	go.etcd.io/bbolt v1.4.3
-	golang.org/x/sync v0.16.0
+	golang.org/x/sync v0.17.0
 )
 
 require (
