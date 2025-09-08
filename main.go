@@ -128,7 +128,12 @@ func (p *program) run(ctx context.Context, bucketNames []string) (err error) {
 	stats := newCleanupStats()
 
 	defer func() {
-		slog.InfoContext(ctx, "Statistics", stats.attrs()...)
+		attrs := []any{
+			slog.Bool("dry_run", p.dryRun),
+		}
+		attrs = append(attrs, stats.attrs()...)
+
+		slog.InfoContext(ctx, "Statistics", attrs...)
 	}()
 
 	var bucketErrors []error
