@@ -24,7 +24,8 @@ func TestFindFirstExtended(t *testing.T) {
 			want: -1,
 		},
 		{
-			name: "regular",
+			name:   "single current",
+			cutoff: time.Date(2000, time.January, 1, 0, 0, 0, 0, time.UTC),
 			versions: []objectVersion{
 				{
 					lastModified: time.Date(2001, time.January, 1, 0, 0, 0, 0, time.UTC),
@@ -33,7 +34,8 @@ func TestFindFirstExtended(t *testing.T) {
 			},
 		},
 		{
-			name: "regular multiple",
+			name:   "multiple current",
+			cutoff: time.Date(2000, time.January, 1, 0, 0, 0, 0, time.UTC),
 			versions: []objectVersion{
 				{lastModified: time.Date(2001, time.January, 1, 0, 0, 0, 0, time.UTC)},
 				{lastModified: time.Date(2001, time.February, 1, 0, 0, 0, 0, time.UTC)},
@@ -45,7 +47,30 @@ func TestFindFirstExtended(t *testing.T) {
 			want: 2,
 		},
 		{
-			name:   "regular multiple with delete marker",
+			name:   "multiple expired",
+			cutoff: time.Date(2004, time.February, 20, 0, 0, 0, 0, time.UTC),
+			versions: []objectVersion{
+				{lastModified: time.Date(2001, time.January, 1, 0, 0, 0, 0, time.UTC)},
+				{lastModified: time.Date(2001, time.February, 1, 0, 0, 0, 0, time.UTC)},
+				{
+					lastModified: time.Date(2001, time.March, 1, 0, 0, 0, 0, time.UTC),
+					isLatest:     true,
+				},
+			},
+			want: 2,
+		},
+		{
+			name:   "multiple expired without latest",
+			cutoff: time.Date(2004, time.February, 20, 0, 0, 0, 0, time.UTC),
+			versions: []objectVersion{
+				{lastModified: time.Date(2001, time.January, 1, 0, 0, 0, 0, time.UTC)},
+				{lastModified: time.Date(2001, time.February, 1, 0, 0, 0, 0, time.UTC)},
+				{lastModified: time.Date(2001, time.March, 1, 0, 0, 0, 0, time.UTC)},
+			},
+			want: -1,
+		},
+		{
+			name:   "multiple expired with current delete marker",
 			cutoff: time.Date(2001, time.February, 20, 0, 0, 0, 0, time.UTC),
 			versions: []objectVersion{
 				{lastModified: time.Date(2001, time.January, 1, 0, 0, 0, 0, time.UTC)},
@@ -59,7 +84,7 @@ func TestFindFirstExtended(t *testing.T) {
 			want: 1,
 		},
 		{
-			name:   "regular multiple with expired delete marker",
+			name:   "multiple expired with expired delete marker",
 			cutoff: time.Date(2003, time.January, 1, 0, 0, 0, 0, time.UTC),
 			versions: []objectVersion{
 				{lastModified: time.Date(2001, time.January, 1, 0, 0, 0, 0, time.UTC)},
@@ -73,7 +98,7 @@ func TestFindFirstExtended(t *testing.T) {
 			want: -1,
 		},
 		{
-			name:   "delete marker",
+			name:   "current delete marker",
 			cutoff: time.Date(2000, time.January, 1, 0, 0, 0, 0, time.UTC),
 			versions: []objectVersion{
 				{
@@ -89,6 +114,81 @@ func TestFindFirstExtended(t *testing.T) {
 			versions: []objectVersion{
 				{
 					lastModified: time.Date(2001, time.January, 1, 0, 0, 0, 0, time.UTC),
+					deleteMarker: true,
+					isLatest:     true,
+				},
+			},
+			want: -1,
+		},
+		{
+			name:   "multiple current delete markers",
+			cutoff: time.Date(2000, time.January, 1, 0, 0, 0, 0, time.UTC),
+			versions: []objectVersion{
+				{
+					lastModified: time.Date(2001, time.January, 1, 0, 0, 0, 0, time.UTC),
+				},
+				{
+					lastModified: time.Date(2002, time.January, 1, 0, 0, 0, 0, time.UTC),
+				},
+				{
+					lastModified: time.Date(2003, time.January, 1, 0, 0, 0, 0, time.UTC),
+					deleteMarker: true,
+				},
+				{
+					lastModified: time.Date(2004, time.January, 1, 0, 0, 0, 0, time.UTC),
+				},
+				{
+					lastModified: time.Date(2005, time.January, 1, 0, 0, 0, 0, time.UTC),
+					deleteMarker: true,
+					isLatest:     true,
+				},
+			},
+			want: 3,
+		},
+		{
+			name:   "multiple expired with current delete marker",
+			cutoff: time.Date(2004, time.December, 1, 0, 0, 0, 0, time.UTC),
+			versions: []objectVersion{
+				{
+					lastModified: time.Date(2001, time.January, 1, 0, 0, 0, 0, time.UTC),
+				},
+				{
+					lastModified: time.Date(2002, time.January, 1, 0, 0, 0, 0, time.UTC),
+				},
+				{
+					lastModified: time.Date(2003, time.January, 1, 0, 0, 0, 0, time.UTC),
+					deleteMarker: true,
+				},
+				{
+					lastModified: time.Date(2004, time.January, 1, 0, 0, 0, 0, time.UTC),
+				},
+				{
+					lastModified: time.Date(2005, time.January, 1, 0, 0, 0, 0, time.UTC),
+					deleteMarker: true,
+					isLatest:     true,
+				},
+			},
+			want: 3,
+		},
+		{
+			name:   "multiple expired delete markers",
+			cutoff: time.Date(2010, time.January, 1, 0, 0, 0, 0, time.UTC),
+			versions: []objectVersion{
+				{
+					lastModified: time.Date(2001, time.January, 1, 0, 0, 0, 0, time.UTC),
+				},
+				{
+					lastModified: time.Date(2002, time.January, 1, 0, 0, 0, 0, time.UTC),
+				},
+				{
+					lastModified: time.Date(2003, time.January, 1, 0, 0, 0, 0, time.UTC),
+					deleteMarker: true,
+				},
+				{
+					lastModified: time.Date(2004, time.January, 1, 0, 0, 0, 0, time.UTC),
+				},
+				{
+					lastModified: time.Date(2005, time.January, 1, 0, 0, 0, 0, time.UTC),
 					deleteMarker: true,
 					isLatest:     true,
 				},

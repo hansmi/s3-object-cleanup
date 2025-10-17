@@ -13,6 +13,8 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+// findFirstExtended identifies the first version which needs to have its
+// retention period extended.
 func findFirstExtended(versions []objectVersion, recent func(objectVersion) bool) int {
 	for idx, ov := range slices.Backward(versions) {
 		if !ov.isLatest {
@@ -24,8 +26,8 @@ func findFirstExtended(versions []objectVersion, recent func(objectVersion) bool
 		}
 
 		if recent(ov) {
-			// Walk backwards to find a regular version preceding the delete
-			// marker.
+			// Extend from the most recent regular version preceding the
+			// delete marker.
 			for i := idx - 1; i >= 0; i-- {
 				if !versions[i].deleteMarker {
 					return i
