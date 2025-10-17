@@ -380,21 +380,27 @@ func TestVersionSeriesCheck(t *testing.T) {
 				s.add(i)
 			}
 
-			got := s.check(tc.cutoff)
+			check := func() ([]string, []string) {
+				got := s.check(tc.cutoff)
 
-			extract := func(versions []objectVersion) (result []string) {
-				for _, i := range versions {
-					result = append(result, i.versionID)
+				extract := func(versions []objectVersion) (result []string) {
+					for _, i := range versions {
+						result = append(result, i.versionID)
+					}
+					return
 				}
-				return
+
+				expired := extract(got.expired)
+				extend := extract(got.extend)
+
+				if got := set.NewSet(expired...).Intersect(set.NewSet(extend...)); !got.IsEmpty() {
+					t.Errorf("Expired and extended versions intersect: %q", set.Sorted(got))
+				}
+
+				return expired, extend
 			}
 
-			gotExpired := extract(got.expired)
-			gotExtend := extract(got.extend)
-
-			if got := set.NewSet(gotExpired...).Intersect(set.NewSet(gotExtend...)); !got.IsEmpty() {
-				t.Errorf("Expired and extended versions intersect: %q", set.Sorted(got))
-			}
+			gotExpired, gotExtend := check()
 
 			if diff := cmp.Diff(tc.wantExpired, gotExpired, cmpopts.EquateEmpty()); diff != "" {
 				t.Errorf("Expired versions diff (-want +got):\n%s", diff)
@@ -402,6 +408,12 @@ func TestVersionSeriesCheck(t *testing.T) {
 
 			if diff := cmp.Diff(tc.wantExtend, gotExtend, cmpopts.EquateEmpty()); diff != "" {
 				t.Errorf("Extend versions diff (-want +got):\n%s", diff)
+			}
+
+			gotExpired, _ = check()
+
+			if len(gotExpired) > 0 {
+				t.Errorf("Second check returned a non-empty expiration set: %v", gotExpired)
 			}
 		})
 	}
