@@ -13,39 +13,9 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// findFirstExtended identifies the first version which needs to have its
-// retention period extended.
-func findFirstExtended(versions []objectVersion, recent func(objectVersion) bool) int {
-	for idx, ov := range slices.Backward(versions) {
-		if !ov.isLatest {
-			continue
-		}
-
-		if !ov.deleteMarker {
-			return idx
-		}
-
-		if recent(ov) {
-			// Extend from the most recent regular version preceding the
-			// delete marker.
-			for i := idx - 1; i >= 0; i-- {
-				if !versions[i].deleteMarker {
-					return i
-				}
-			}
-
-			return idx
-		}
-
-		break
-	}
-
-	return -1
-}
-
 type versionSeriesResult struct {
-	expired []objectVersion
-	extend  []objectVersion
+	expired   []objectVersion
+	retention []retentionExtenderRequest
 }
 
 type versionSeries struct {
@@ -79,56 +49,128 @@ func (s *versionSeries) add(v objectVersion) {
 	s.items = slices.Insert(s.items, pos, v)
 }
 
-func (s *versionSeries) check(cutoff time.Time) (result versionSeriesResult) {
-	// Avoid making changes unless the latest version is known.
+type versionSeriesFinalizeOptions struct {
+	now            time.Time
+	minRetention   time.Duration
+	minDeletionAge time.Duration
+}
+
+func (o *versionSeriesFinalizeOptions) extendFromNow(ov objectVersion) (retentionExtenderRequest, bool) {
+	origin := o.now
+
+	if origin.Before(ov.lastModified) {
+		origin = ov.lastModified
+	}
+
+	return o.extend(ov, origin.Add(o.minRetention))
+}
+
+func (o *versionSeriesFinalizeOptions) extend(ov objectVersion, until time.Time) (retentionExtenderRequest, bool) {
+	req := retentionExtenderRequest{
+		object: ov,
+		until:  until.Truncate(time.Second),
+	}
+
+	return req, (ov.retainUntil.IsZero() || ov.retainUntil.Before(req.until)) && !ov.deleteMarker
+}
+
+func (s *versionSeries) finalize(opts versionSeriesFinalizeOptions) (result versionSeriesResult) {
+	// Apply the default retention extension and avoid deletions unless the
+	// latest version is known.
 	if !s.haveLatest {
-		result.extend = s.items
+		for _, ov := range s.items {
+			if req, ok := opts.extendFromNow(ov); ok {
+				result.retention = append(result.retention, req)
+			}
+		}
+
 		return
 	}
 
-	recent := func(ov objectVersion) bool {
-		if !ov.retainUntil.IsZero() && cutoff.Before(ov.retainUntil) {
-			return true
+	pos := len(s.items) - 1
+
+	// Look for latest version and extend all versions until there.
+	for ; pos >= 0; pos-- {
+		ov := s.items[pos]
+
+		if ov.isLatest {
+			// Delete markers don't support retention periods.
+			if ov.deleteMarker {
+				expires := ov.lastModified.Add(opts.minDeletionAge)
+
+				if expires.Before(opts.now) {
+					// Already expired
+					pos++
+					break
+				}
+
+				// Extend retention of the most recent regular version
+				// preceding the delete marker.
+				for ; pos >= 0; pos-- {
+					ov = s.items[pos]
+
+					if ov.deleteMarker {
+						continue
+					}
+
+					if req, ok := opts.extend(ov, expires); ok {
+						result.retention = append(result.retention, req)
+					}
+
+					break
+				}
+			} else if req, ok := opts.extendFromNow(ov); ok {
+				result.retention = append(result.retention, req)
+			}
+
+			break
 		}
 
-		return cutoff.Before(ov.lastModified)
+		if req, ok := opts.extendFromNow(ov); ok {
+			result.retention = append(result.retention, req)
+		}
 	}
 
-	earlier := s.items
+	if pos >= 0 {
+		cutoff := opts.now.Add(-opts.minDeletionAge)
 
-	if firstExtended := findFirstExtended(s.items, recent); firstExtended >= 0 {
-		result.extend = slices.Clone(s.items[firstExtended:])
-		earlier = s.items[:firstExtended]
-	}
+		for _, ov := range s.items[:pos] {
+			if !ov.lastModified.Before(cutoff) {
+				break
+			}
 
-	firstKept := 0
+			if !(ov.retainUntil.IsZero() || ov.retainUntil.Before(cutoff)) {
+				break
+			}
 
-	for ; firstKept < len(earlier) && !recent(earlier[firstKept]); firstKept++ {
-	}
-
-	if firstKept > 0 {
-		result.expired = slices.Clone(s.items[:firstKept])
-
-		// Remove expired versions.
-		s.items = slices.Replace(s.items, 0, firstKept)
+			result.expired = append(result.expired, ov)
+		}
 	}
 
 	return
 }
 
 type processor struct {
-	stats  *cleanupStats
-	cutoff time.Time
+	stats          *cleanupStats
+	minRetention   time.Duration
+	minDeletionAge time.Duration
 }
 
-func newProcessor(stats *cleanupStats, minAge time.Duration) *processor {
+type processorOptions struct {
+	stats          *cleanupStats
+	minDeletionAge time.Duration
+	minRetention   time.Duration
+}
+
+func newProcessor(opts processorOptions) *processor {
 	return &processor{
-		stats:  stats,
-		cutoff: time.Now().Add(-minAge).Truncate(time.Minute),
+		stats:          opts.stats,
+		minDeletionAge: opts.minDeletionAge,
+		minRetention:   opts.minRetention,
 	}
 }
 
-func (p *processor) run(in <-chan objectVersion, extendCh, deleteCh chan<- objectVersion) error {
+func (p *processor) run(in <-chan objectVersion, retentionCh chan<- retentionExtenderRequest, deleteCh chan<- objectVersion) {
 	objects := map[string]*versionSeries{}
 
 	for ov := range in {
@@ -143,26 +185,25 @@ func (p *processor) run(in <-chan objectVersion, extendCh, deleteCh chan<- objec
 		}
 
 		s.add(ov)
+	}
 
-		for _, i := range s.check(p.cutoff).expired {
-			// Early deletions
-			deleteCh <- i
-		}
+	finalizeOpts := versionSeriesFinalizeOptions{
+		now:            time.Now(),
+		minDeletionAge: p.minDeletionAge,
+		minRetention:   p.minRetention,
 	}
 
 	for _, s := range objects {
-		checkResult := s.check(p.cutoff)
+		result := s.finalize(finalizeOpts)
 
-		for _, i := range checkResult.expired {
+		for _, i := range result.expired {
 			deleteCh <- i
 		}
 
-		for _, i := range checkResult.extend {
-			extendCh <- i
+		for _, i := range result.retention {
+			retentionCh <- i
 		}
 	}
-
-	return nil
 }
 
 type cleanupOptions struct {
@@ -172,7 +213,7 @@ type cleanupOptions struct {
 	client *client.Client
 	dryRun bool
 
-	minAge                time.Duration
+	minDeletionAge        time.Duration
 	minRetention          time.Duration
 	minRetentionThreshold time.Duration
 }
@@ -185,7 +226,7 @@ func cleanup(ctx context.Context, opts cleanupOptions) error {
 
 	annotateCh := make(chan objectVersion, 8)
 	handleCh := make(chan objectVersion, 8)
-	extendCh := make(chan objectVersion, 8)
+	retentionCh := make(chan retentionExtenderRequest, 8)
 	deleteCh := make(chan objectVersion, 8)
 
 	g, ctx := errgroup.WithContext(ctx)
@@ -208,11 +249,16 @@ func cleanup(ctx context.Context, opts cleanupOptions) error {
 	})
 	g.Go(func() error {
 		defer close(deleteCh)
-		defer close(extendCh)
+		defer close(retentionCh)
 
-		p := newProcessor(opts.stats, opts.minAge)
+		p := newProcessor(processorOptions{
+			stats:          opts.stats,
+			minRetention:   opts.minRetention,
+			minDeletionAge: opts.minDeletionAge,
+		})
+		p.run(handleCh, retentionCh, deleteCh)
 
-		return p.run(handleCh, extendCh, deleteCh)
+		return nil
 	})
 	g.Go(func() error {
 		e := newRetentionExtender(retentionExtenderOptions{
@@ -220,12 +266,11 @@ func cleanup(ctx context.Context, opts cleanupOptions) error {
 			stats:        opts.stats,
 			state:        bucketState,
 			client:       opts.client,
+			minRemaining: opts.minRetentionThreshold,
 			dryRun:       opts.dryRun,
-			minRetention: opts.minRetention,
-			threshold:    opts.minRetentionThreshold,
 		})
 
-		return e.run(ctx, extendCh)
+		return e.run(ctx, retentionCh)
 	})
 	g.Go(func() error {
 		deleter := newBatchDeleter(batchDeleterOptions{

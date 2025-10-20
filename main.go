@@ -19,18 +19,18 @@ import (
 	"github.com/hansmi/s3-object-cleanup/internal/state"
 )
 
-const minAgeDaysDefault = 32
+const minDeletionAgeDaysDefault = 32
 const defaultMinRetentionDays = 32
 const defaultMinRetentionThresholdDays = defaultMinRetentionDays / 4
 
 type program struct {
 	dryRun bool
-	minAge time.Duration
 
-	persistenceBucket string
-
+	minDeletionAge        time.Duration
 	minRetention          time.Duration
 	minRetentionThreshold time.Duration
+
+	persistenceBucket string
 }
 
 func (p *program) registerFlags() {
@@ -38,10 +38,10 @@ func (p *program) registerFlags() {
 		env.MustGetBool("S3_OBJECT_CLEANUP_DRY_RUN", true),
 		"Perform a trial run without actually deleting objects. Defaults to $S3_OBJECT_CLEANUP_DRY_RUN.")
 
-	flag.DurationVar(&p.minAge, "min_age",
-		env.MustGetDuration("S3_OBJECT_CLEANUP_MIN_AGE", minAgeDaysDefault*24*time.Hour),
+	flag.DurationVar(&p.minDeletionAge, "min_age",
+		env.MustGetDuration("S3_OBJECT_CLEANUP_MIN_AGE", minDeletionAgeDaysDefault*24*time.Hour),
 		fmt.Sprintf("Minimum object version age before considering for deletion. Defaults to $S3_OBJECT_CLEANUP_MIN_AGE or %d days.",
-			minAgeDaysDefault))
+			minDeletionAgeDaysDefault))
 
 	flag.DurationVar(&p.minRetention, "min_retention",
 		env.MustGetDuration("S3_OBJECT_CLEANUP_MIN_RETENTION", defaultMinRetentionDays*24*time.Hour),
@@ -147,7 +147,7 @@ func (p *program) run(ctx context.Context, bucketNames []string) (err error) {
 			state:                 s,
 			client:                c,
 			dryRun:                p.dryRun,
-			minAge:                p.minAge,
+			minDeletionAge:        p.minDeletionAge,
 			minRetention:          p.minRetention,
 			minRetentionThreshold: p.minRetentionThreshold,
 		}); err != nil {

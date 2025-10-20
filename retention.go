@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"os"
 	"time"
 
 	"golang.org/x/sync/errgroup"
@@ -17,20 +18,20 @@ type retentionExtenderClient interface {
 	PutObjectRetention(context.Context, string, string, time.Time) error
 }
 
+type retentionExtenderRequest struct {
+	object objectVersion
+	until  time.Time
+}
+
 type retentionExtender struct {
-	logger *slog.Logger
-	stats  *cleanupStats
-	state  retentionExtenderState
-	client retentionExtenderClient
-
-	workers int
-
-	now time.Time
-
-	minRetention time.Duration
-	threshold    time.Duration
-
-	dryRun bool
+	logger       *slog.Logger
+	stats        *cleanupStats
+	state        retentionExtenderState
+	client       retentionExtenderClient
+	workers      int
+	now          time.Time
+	minRemaining time.Duration
+	dryRun       bool
 }
 
 type retentionExtenderOptions struct {
@@ -44,11 +45,11 @@ type retentionExtenderOptions struct {
 	now time.Time
 
 	// Object version retention must be at least least the given duration.
-	minRetention time.Duration
+	// minRetention time.Duration
 
-	// Set retention when it's missing or the remaining duration is less than
-	// the threshold.
-	threshold time.Duration
+	// Update retention when it's missing or the remaining duration is less
+	// than minRemaining.
+	minRemaining time.Duration
 }
 
 func newRetentionExtender(opts retentionExtenderOptions) *retentionExtender {
@@ -63,34 +64,41 @@ func newRetentionExtender(opts retentionExtenderOptions) *retentionExtender {
 		client:       opts.client,
 		dryRun:       opts.dryRun,
 		now:          opts.now,
-		minRetention: max(0, opts.minRetention),
-		threshold:    max(0, opts.threshold),
+		minRemaining: max(0, opts.minRemaining),
 		workers:      4,
 	}
 }
 
-func (e *retentionExtender) extend(ctx context.Context, ov objectVersion) error {
-	if ov.deleteMarker {
+func (e *retentionExtender) process(ctx context.Context, req retentionExtenderRequest) error {
+	if req.object.deleteMarker {
 		// Delete markers don't support retention periods.
 		return nil
 	}
 
-	until := e.now.Add(e.minRetention).Truncate(time.Second)
+	if req.until.IsZero() {
+		return fmt.Errorf("%w: missing retention time", os.ErrInvalid)
+	}
 
-	if ov.retainUntil.IsZero() || (until.After(ov.retainUntil) && ov.retainUntil.Sub(e.now) < e.threshold) {
+	remaining := req.until.Sub(e.now).Truncate(time.Second)
+
+	if req.object.retainUntil.IsZero() || remaining < e.minRemaining {
 		e.logger.InfoContext(ctx, "Extending object retention",
-			slog.Any("object", ov),
-			slog.Time("until", until),
+			slog.Any("object", req.object),
+			slog.Duration("remaining", remaining),
+			slog.Time("until", req.until),
 		)
 
-		e.stats.addRetention(ov)
+		// TODO: Log remaining time range.
+		e.stats.addRetention(req.object)
 
 		if !e.dryRun {
-			if err := e.client.PutObjectRetention(ctx, ov.key, ov.versionID, until); err != nil {
+			ov := req.object
+
+			if err := e.client.PutObjectRetention(ctx, ov.key, ov.versionID, req.until); err != nil {
 				return fmt.Errorf("setting object retention via API: %w", err)
 			}
 
-			if err := e.state.SetObjectRetention(ov.key, ov.versionID, until); err != nil {
+			if err := e.state.SetObjectRetention(ov.key, ov.versionID, req.until); err != nil {
 				return fmt.Errorf("setting object retention in state: %w", err)
 			}
 		}
@@ -99,17 +107,16 @@ func (e *retentionExtender) extend(ctx context.Context, ov objectVersion) error 
 	return nil
 }
 
-// run extends the retention duration on all objects received from the incoming
-// channel.
-func (e *retentionExtender) run(ctx context.Context, in <-chan objectVersion) error {
+// run sets the retention time on objects received via the incoming channel.
+func (e *retentionExtender) run(ctx context.Context, in <-chan retentionExtenderRequest) error {
 	g, ctx := errgroup.WithContext(ctx)
 
 	for range max(1, e.workers) {
 		g.Go(func() error {
-			for ov := range in {
-				if err := e.extend(ctx, ov); err != nil {
+			for req := range in {
+				if err := e.process(ctx, req); err != nil {
 					e.logger.Error("Retention extension failed",
-						slog.Any("object", ov),
+						slog.Any("request", req),
 						slog.Any("error", err))
 					e.stats.addRetentionError()
 					continue

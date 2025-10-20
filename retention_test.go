@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"log/slog"
+	"os"
 	"sync"
 	"testing"
 	"time"
@@ -27,66 +28,71 @@ func (c *fakeExtenderClient) PutObjectRetention(_ context.Context, _ string, _ s
 	return c.err
 }
 
-func TestExtend(t *testing.T) {
-	ctx := context.Background()
-
+func TestRetentionProcess(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 
 	now := time.Date(2015, time.January, 1, 0, 0, 0, 0, time.UTC)
 
 	for _, tc := range []struct {
 		name         string
-		ov           objectVersion
-		minRetention time.Duration
-		threshold    time.Duration
+		req          retentionExtenderRequest
+		minRemaining time.Duration
 		want         []time.Time
 		wantErr      error
 	}{
 		{
-			name: "zero",
-			want: []time.Time{now},
+			name:    "zero",
+			wantErr: os.ErrInvalid,
 		},
 		{
-			name: "normal extension",
-			ov: objectVersion{
-				retainUntil: time.Date(2015, time.January, 10, 0, 0, 0, 0, time.UTC),
+			name: "normal",
+			req: retentionExtenderRequest{
+				object: objectVersion{
+					retainUntil: time.Date(2015, time.January, 10, 0, 0, 0, 0, time.UTC),
+				},
+				until: time.Date(2015, time.January, 20, 0, 0, 0, 0, time.UTC),
 			},
-			minRetention: 14 * 24 * time.Hour,
-			threshold:    10 * 24 * time.Hour,
+			minRemaining: 100 * 24 * time.Hour,
 			want: []time.Time{
-				time.Date(2015, time.January, 15, 0, 0, 0, 0, time.UTC),
+				time.Date(2015, time.January, 20, 0, 0, 0, 0, time.UTC),
 			},
 		},
 		{
 			name: "already retained beyond extension time",
-			ov: objectVersion{
-				retainUntil: time.Date(2015, time.January, 10, 0, 0, 0, 0, time.UTC),
+			req: retentionExtenderRequest{
+				object: objectVersion{
+					retainUntil: time.Date(2015, time.January, 30, 0, 0, 0, 0, time.UTC),
+				},
+				until: time.Date(2015, time.January, 20, 0, 0, 0, 0, time.UTC),
 			},
-			minRetention: 7 * 24 * time.Hour,
-			threshold:    14 * 24 * time.Hour,
 		},
 		{
 			name: "not yet time for extension",
-			ov: objectVersion{
-				retainUntil: time.Date(2015, time.January, 10, 0, 0, 0, 0, time.UTC),
+			req: retentionExtenderRequest{
+				object: objectVersion{
+					retainUntil: time.Date(2015, time.January, 10, 0, 0, 0, 0, time.UTC),
+				},
+				until: time.Date(2015, time.January, 20, 0, 0, 0, 0, time.UTC),
 			},
-			minRetention: 14 * 24 * time.Hour,
-			threshold:    24 * time.Hour,
+			minRemaining: 3 * 24 * time.Hour,
 		},
 		{
-			name:         "version has no retention",
-			minRetention: 7 * 24 * time.Hour,
-			threshold:    24 * time.Hour,
+			name: "version has no retention",
+			req: retentionExtenderRequest{
+				object: objectVersion{},
+				until:  time.Date(2015, time.January, 10, 0, 0, 0, 0, time.UTC),
+			},
 			want: []time.Time{
-				time.Date(2015, time.January, 8, 0, 0, 0, 0, time.UTC),
+				time.Date(2015, time.January, 10, 0, 0, 0, 0, time.UTC),
 			},
 		},
 		{
 			name: "delete marker",
-			ov: objectVersion{
-				deleteMarker: true,
+			req: retentionExtenderRequest{
+				object: objectVersion{
+					deleteMarker: true,
+				},
 			},
-			minRetention: 7 * 24 * time.Hour,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -99,38 +105,37 @@ func TestExtend(t *testing.T) {
 				state:        state,
 				client:       &client,
 				now:          now,
-				minRetention: tc.minRetention,
-				threshold:    tc.threshold,
+				minRemaining: tc.minRemaining,
 			}
 
-			err := newRetentionExtender(opts).extend(ctx, tc.ov)
+			err := newRetentionExtender(opts).process(t.Context(), tc.req)
 
 			if diff := cmp.Diff(tc.wantErr, err, cmpopts.EquateErrors()); diff != "" {
 				t.Errorf("Error diff (-want +got):\n%s", diff)
 			}
 
-			if diff := cmp.Diff(tc.want, client.requests, cmpopts.EquateEmpty()); diff != "" {
-				t.Errorf("Requests diff (-want +got):\n%s", diff)
-			}
+			if err == nil {
+				if diff := cmp.Diff(tc.want, client.requests, cmpopts.EquateEmpty()); diff != "" {
+					t.Errorf("Requests diff (-want +got):\n%s", diff)
+				}
 
-			var wantState time.Time
+				var wantState time.Time
 
-			if len(tc.want) > 0 {
-				wantState = tc.want[len(tc.want)-1]
-			}
+				if len(tc.want) > 0 {
+					wantState = tc.want[len(tc.want)-1]
+				}
 
-			if gotState, err := state.GetObjectRetention(tc.ov.key, tc.ov.versionID); err != nil {
-				t.Errorf("GetObjectRetention() failed: %v", err)
-			} else if diff := cmp.Diff(wantState, gotState); diff != "" {
-				t.Errorf("GetObjectRetention() diff (-want +got):\n%s", diff)
+				if gotState, err := state.GetObjectRetention(tc.req.object.key, tc.req.object.versionID); err != nil {
+					t.Errorf("GetObjectRetention() failed: %v", err)
+				} else if diff := cmp.Diff(wantState, gotState); diff != "" {
+					t.Errorf("GetObjectRetention() diff (-want +got):\n%s", diff)
+				}
 			}
 		})
 	}
 }
 
 func TestExtenderRun(t *testing.T) {
-	ctx := context.Background()
-
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 
 	state := newRetentionStateForTest(t)
@@ -143,7 +148,7 @@ func TestExtenderRun(t *testing.T) {
 		client: &client,
 	}
 
-	ch := make(chan objectVersion)
+	ch := make(chan retentionExtenderRequest)
 
 	var wg sync.WaitGroup
 
@@ -153,7 +158,9 @@ func TestExtenderRun(t *testing.T) {
 		defer close(ch)
 
 		for range 100 {
-			ch <- objectVersion{}
+			ch <- retentionExtenderRequest{
+				object: objectVersion{},
+			}
 		}
 	}()
 
@@ -161,7 +168,7 @@ func TestExtenderRun(t *testing.T) {
 	go func() {
 		defer wg.Done()
 
-		if err := newRetentionExtender(opts).run(ctx, ch); err != nil {
+		if err := newRetentionExtender(opts).run(t.Context(), ch); err != nil {
 			t.Errorf("run() failed: %v", err)
 		}
 	}()
