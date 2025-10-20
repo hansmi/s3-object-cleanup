@@ -32,4 +32,5 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.35.2 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sts v1.38.7 // indirect
 	golang.org/x/sys v0.29.0 // indirect
+	gonum.org/v1/gonum v0.16.0 // indirect
 )

@@ -1,8 +1,7 @@
 package main
 
 import (
-	"math/rand/v2"
-	"reflect"
+	"fmt"
 	"slices"
 	"testing"
 	"time"
@@ -10,6 +9,7 @@ import (
 	set "github.com/deckarep/golang-set/v2"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"gonum.org/v1/gonum/stat/combin"
 )
 
 func TestFindFirstExtended(t *testing.T) {
@@ -213,7 +213,7 @@ func TestFindFirstExtended(t *testing.T) {
 }
 
 func TestVersionSeriesAdd(t *testing.T) {
-	want := []objectVersion{
+	versions := []objectVersion{
 		{
 			lastModified: time.Date(2000, time.January, 1, 0, 0, 0, 0, time.UTC),
 			versionID:    "jan-1",
@@ -239,20 +239,34 @@ func TestVersionSeriesAdd(t *testing.T) {
 		},
 	}
 
-	for range len(want) {
-		versions := slices.Clone(want)
+	for _, order := range combin.Permutations(len(versions), len(versions)) {
+		t.Run(fmt.Sprint(order), func(t *testing.T) {
+			t.Parallel()
 
-		rand.Shuffle(len(versions), reflect.Swapper(versions))
+			var selected []objectVersion
 
-		s := newVersionSeries(t.Name())
+			for _, i := range order {
+				selected = append(selected, versions[i])
+			}
 
-		for _, i := range versions {
-			s.add(i)
-		}
+			for count := range len(selected) {
+				s := newVersionSeries(t.Name())
 
-		if diff := cmp.Diff(want, s.items, cmp.AllowUnexported(objectVersion{})); diff != "" {
-			t.Errorf("Versions diff (-want +got):\n%s", diff)
-		}
+				for _, ov := range selected[:count] {
+					s.add(ov)
+				}
+
+				var want []objectVersion
+
+				for _, i := range slices.Sorted(slices.Values(order[:count])) {
+					want = append(want, versions[i])
+				}
+
+				if diff := cmp.Diff(want, s.items, cmpopts.EquateEmpty(), cmp.AllowUnexported(objectVersion{})); diff != "" {
+					t.Errorf("Versions diff (-want +got):\n%s", diff)
+				}
+			}
+		})
 	}
 }
 
