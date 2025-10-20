@@ -75,50 +75,50 @@ func newCleanupStats() *cleanupStats {
 
 func (s *cleanupStats) addRetentionAnnotationError() {
 	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	s.retentionAnnotationErrorCount++
+	s.mu.Unlock()
 }
 
 func (s *cleanupStats) discovered(v objectVersion) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	s.totalCount++
 	s.totalSize.add(v.size)
 	s.totalModTime.update(v.lastModified)
 	s.totalRetainUntil.update(v.retainUntil)
+	s.mu.Unlock()
 }
 
 func (s *cleanupStats) addRetention(v objectVersion) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	s.retentionSuccessCount++
 	s.retentionModTime.update(v.lastModified)
 
 	if !v.retainUntil.IsZero() {
 		s.retentionOriginal.update(v.retainUntil)
 	}
+
+	s.mu.Unlock()
 }
 
 func (s *cleanupStats) addRetentionError() {
 	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	s.retentionErrorCount++
+	s.mu.Unlock()
 }
 
 func (s *cleanupStats) addDelete(v objectVersion) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	s.deleteCount++
 	s.deleteSize.add(v.size)
 	s.deleteModTime.update(v.lastModified)
+	s.mu.Unlock()
 }
 
 func (s *cleanupStats) addDeleteResults(successCount, errorCount int) {
+	if successCount == 0 && errorCount == 0 {
+		return
+	}
+
 	s.mu.Lock()
 	s.deleteSuccessCount += int64(successCount)
 	s.deleteErrorCount += int64(errorCount)
