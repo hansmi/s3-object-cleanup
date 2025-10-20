@@ -228,7 +228,13 @@ func cleanup(ctx context.Context, opts cleanupOptions) error {
 		return e.run(ctx, extendCh)
 	})
 	g.Go(func() error {
-		deleter := newBatchDeleter(opts.logger, opts.stats, opts.client, opts.dryRun)
+		deleter := newBatchDeleter(batchDeleterOptions{
+			logger: opts.logger,
+			stats:  opts.stats,
+			client: opts.client.S3(),
+			bucket: opts.client.Name(),
+			dryRun: opts.dryRun,
+		})
 
 		return deleter.run(ctx, deleteCh)
 	})

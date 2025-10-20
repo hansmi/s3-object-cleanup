@@ -7,35 +7,48 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
-	"github.com/hansmi/s3-object-cleanup/internal/client"
 	"golang.org/x/sync/errgroup"
 )
 
 const batchSize = 250
 
-type batchDeleter struct {
-	logger     *slog.Logger
-	stats      *cleanupStats
-	dryRun     bool
-	client     *s3.Client
-	bucketName string
-	workers    int
+type batchDeleterClient interface {
+	DeleteObjects(context.Context, *s3.DeleteObjectsInput, ...func(*s3.Options)) (*s3.DeleteObjectsOutput, error)
 }
 
-func newBatchDeleter(logger *slog.Logger, stats *cleanupStats, c *client.Client, dryRun bool) *batchDeleter {
+type batchDeleterCheckFunc func(objectVersion) bool
+
+type batchDeleterOptions struct {
+	logger *slog.Logger
+	stats  *cleanupStats
+	client batchDeleterClient
+	bucket string
+	dryRun bool
+}
+
+type batchDeleter struct {
+	logger  *slog.Logger
+	stats   *cleanupStats
+	dryRun  bool
+	client  batchDeleterClient
+	bucket  string
+	workers int
+}
+
+func newBatchDeleter(opts batchDeleterOptions) *batchDeleter {
 	return &batchDeleter{
-		logger:     logger,
-		stats:      stats,
-		dryRun:     dryRun,
-		client:     c.S3(),
-		bucketName: c.Name(),
-		workers:    4,
+		logger:  opts.logger,
+		stats:   opts.stats,
+		dryRun:  opts.dryRun,
+		client:  opts.client,
+		bucket:  opts.bucket,
+		workers: 4,
 	}
 }
 
 func (d *batchDeleter) deleteBatch(ctx context.Context, items []objectVersion) error {
 	input := &s3.DeleteObjectsInput{
-		Bucket: aws.String(d.bucketName),
+		Bucket: aws.String(d.bucket),
 		Delete: &types.Delete{},
 	}
 

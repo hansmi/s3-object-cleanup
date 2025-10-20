@@ -56,7 +56,13 @@ func TestBatchDeleter(t *testing.T) {
 				t.Fatalf("NewFromName() failed: %v", err)
 			}
 
-			d := newBatchDeleter(logger, stats, b, true)
+			d := newBatchDeleter(batchDeleterOptions{
+				logger: logger,
+				stats:  stats,
+				client: b.S3(),
+				bucket: b.Name(),
+				dryRun: true,
+			})
 
 			ch := make(chan objectVersion)
 
