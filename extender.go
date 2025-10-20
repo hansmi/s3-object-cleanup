@@ -65,8 +65,7 @@ func newRetentionExtender(opts retentionExtenderOptions) *retentionExtender {
 		now:          opts.now,
 		minRetention: max(0, opts.minRetention),
 		threshold:    max(0, opts.threshold),
-
-		workers: 4,
+		workers:      4,
 	}
 }
 
