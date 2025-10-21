@@ -44,9 +44,6 @@ type retentionExtenderOptions struct {
 	// Current time for computations. Defaults to [time.Now()].
 	now time.Time
 
-	// Object version retention must be at least least the given duration.
-	// minRetention time.Duration
-
 	// Update retention when it's missing or the remaining duration is less
 	// than minRemaining.
 	minRemaining time.Duration
