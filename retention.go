@@ -84,7 +84,7 @@ func (e *retentionExtender) process(ctx context.Context, req retentionExtenderRe
 	if req.object.retainUntil.IsZero() || remaining < e.minRemaining {
 		e.logger.InfoContext(ctx, "Extending object retention",
 			slog.Any("object", req.object),
-			slog.Duration("remaining", remaining),
+			slog.String("remaining", remaining.String()),
 			slog.Time("until", req.until),
 		)
 
