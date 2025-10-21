@@ -85,7 +85,6 @@ func (e *retentionExtender) process(ctx context.Context, req retentionExtenderRe
 			slog.Time("until", req.until),
 		)
 
-		// TODO: Log remaining time range.
 		e.stats.addRetention(req.object)
 
 		if !e.dryRun {
