@@ -369,6 +369,26 @@ func TestVersionSeriesFinalize(t *testing.T) {
 			},
 			wantExpired: []string{"jan-1-del"},
 		},
+		{
+			name: "version and delete marker",
+			items: []objectVersion{
+				{
+					lastModified: time.Date(2025, time.August, 29, 0, 0, 0, 0, time.UTC),
+					versionID:    "aug-29",
+					retainUntil:  time.Date(2025, time.October, 16, 0, 0, 0, 0, time.UTC),
+				},
+				{
+					lastModified: time.Date(2025, time.August, 30, 0, 0, 0, 0, time.UTC),
+					versionID:    "aug-30-del",
+					deleteMarker: true,
+					isLatest:     true,
+				},
+			},
+			now:            time.Date(2025, time.October, 22, 0, 0, 0, 0, time.UTC),
+			minRetention:   10 * 24 * time.Hour,
+			minDeletionAge: 20 * 24 * time.Hour,
+			wantExpired:    []string{"aug-29", "aug-30-del"},
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			s := newVersionSeries(t.Name())

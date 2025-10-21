@@ -139,7 +139,7 @@ func (s *versionSeries) finalize(opts versionSeriesFinalizeOptions) (result vers
 				break
 			}
 
-			if !(ov.retainUntil.IsZero() || ov.retainUntil.Before(cutoff)) {
+			if !(ov.retainUntil.IsZero() || ov.retainUntil.Before(opts.now)) {
 				break
 			}
 
