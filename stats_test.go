@@ -12,10 +12,10 @@ import (
 
 func TestTimeRange(t *testing.T) {
 	for _, tc := range []struct {
-		name       string
-		values     []time.Time
-		wantOldest time.Time
-		wantNewest time.Time
+		name      string
+		values    []time.Time
+		wantLower time.Time
+		wantUpper time.Time
 	}{
 		{name: "empty"},
 		{
@@ -23,8 +23,8 @@ func TestTimeRange(t *testing.T) {
 			values: []time.Time{
 				time.Date(2020, time.December, 1, 2, 3, 4, 0, time.UTC),
 			},
-			wantOldest: time.Date(2020, time.December, 1, 2, 3, 4, 0, time.UTC),
-			wantNewest: time.Date(2020, time.December, 1, 2, 3, 4, 0, time.UTC),
+			wantLower: time.Date(2020, time.December, 1, 2, 3, 4, 0, time.UTC),
+			wantUpper: time.Date(2020, time.December, 1, 2, 3, 4, 0, time.UTC),
 		},
 		{
 			name: "three",
@@ -34,8 +34,8 @@ func TestTimeRange(t *testing.T) {
 				time.Date(2020, time.January, 1, 0, 0, 0, 0, time.UTC),
 				time.Date(2020, time.April, 1, 0, 0, 0, 0, time.UTC),
 			},
-			wantOldest: time.Date(2020, time.January, 1, 0, 0, 0, 0, time.UTC),
-			wantNewest: time.Date(2020, time.December, 1, 0, 0, 0, 0, time.UTC),
+			wantLower: time.Date(2020, time.January, 1, 0, 0, 0, 0, time.UTC),
+			wantUpper: time.Date(2020, time.December, 1, 0, 0, 0, 0, time.UTC),
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -46,8 +46,8 @@ func TestTimeRange(t *testing.T) {
 			}
 
 			want := slog.GroupValue(
-				slog.Time("oldest", tc.wantOldest),
-				slog.Time("newest", tc.wantNewest),
+				slog.Time("lower", tc.wantLower),
+				slog.Time("upper", tc.wantUpper),
 			)
 
 			if diff := cmp.Diff(want, r.LogValue()); diff != "" {
@@ -59,8 +59,8 @@ func TestTimeRange(t *testing.T) {
 
 func TestStats(t *testing.T) {
 	type timeRangeStructure struct {
-		Oldest *time.Time `json:"oldest"`
-		Newest *time.Time `json:"newest"`
+		Lower *time.Time `json:"lower"`
+		Upper *time.Time `json:"upper"`
 	}
 
 	type sizeStatsStructure struct {
@@ -108,8 +108,8 @@ func TestStats(t *testing.T) {
 						"text": "0 B"
 					},
 					"mod_time": {
-						"oldest": "0001-01-01T00:00:00Z",
-						"newest": "0001-01-01T00:00:00Z"
+						"lower": "0001-01-01T00:00:00Z",
+						"upper": "0001-01-01T00:00:00Z"
 					}
 				},
 				"retention_annotation": {
@@ -119,12 +119,12 @@ func TestStats(t *testing.T) {
 					"success_count": 0,
 					"error_count": 0,
 					"mod_time": {
-						"oldest": "0001-01-01T00:00:00Z",
-						"newest": "0001-01-01T00:00:00Z"
+						"lower": "0001-01-01T00:00:00Z",
+						"upper": "0001-01-01T00:00:00Z"
 					},
 					"original": {
-						"oldest": "0001-01-01T00:00:00Z",
-						"newest": "0001-01-01T00:00:00Z"
+						"lower": "0001-01-01T00:00:00Z",
+						"upper": "0001-01-01T00:00:00Z"
 					}
 				},
 				"delete": {
@@ -136,8 +136,8 @@ func TestStats(t *testing.T) {
 					"success_count": 0,
 					"error_count": 0,
 					"mod_time": {
-						"oldest": "0001-01-01T00:00:00Z",
-						"newest": "0001-01-01T00:00:00Z"
+						"lower": "0001-01-01T00:00:00Z",
+						"upper": "0001-01-01T00:00:00Z"
 					}
 				}
 			}`,
@@ -173,8 +173,8 @@ func TestStats(t *testing.T) {
 						"text": "7.0 MiB"
 					},
 					"mod_time": {
-						"oldest": "2011-10-01T00:00:00Z",
-						"newest": "2015-01-01T00:00:00Z"
+						"lower": "2011-10-01T00:00:00Z",
+						"upper": "2015-01-01T00:00:00Z"
 					}
 				},
 				"retention_annotation": {
@@ -184,12 +184,12 @@ func TestStats(t *testing.T) {
 					"success_count": 1,
 					"error_count": 0,
 					"mod_time": {
-						"oldest": "2012-10-01T00:00:00Z",
-						"newest": "2012-10-01T00:00:00Z"
+						"lower": "2012-10-01T00:00:00Z",
+						"upper": "2012-10-01T00:00:00Z"
 					},
 					"original": {
-						"oldest": "2019-01-01T00:00:00Z",
-						"newest": "2019-01-01T00:00:00Z"
+						"lower": "2019-01-01T00:00:00Z",
+						"upper": "2019-01-01T00:00:00Z"
 					}
 				},
 				"delete": {
@@ -201,8 +201,8 @@ func TestStats(t *testing.T) {
 					"success_count": 10,
 					"error_count": 20,
 					"mod_time": {
-						"oldest": "2021-03-01T00:00:00Z",
-						"newest": "2021-03-01T00:00:00Z"
+						"lower": "2021-03-01T00:00:00Z",
+						"upper": "2021-03-01T00:00:00Z"
 					}
 				}
 			}`,

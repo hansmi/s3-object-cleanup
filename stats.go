@@ -9,25 +9,25 @@ import (
 )
 
 type timeRange struct {
-	oldest, newest time.Time
+	lower, upper time.Time
 }
 
 var _ slog.LogValuer = (*timeRange)(nil)
 
 func (r *timeRange) update(t time.Time) {
-	if r.oldest.IsZero() || t.Before(r.oldest) {
-		r.oldest = t
+	if r.lower.IsZero() || t.Before(r.lower) {
+		r.lower = t
 	}
 
-	if r.newest.IsZero() || t.After(r.newest) {
-		r.newest = t
+	if r.upper.IsZero() || t.After(r.upper) {
+		r.upper = t
 	}
 }
 
 func (r timeRange) LogValue() slog.Value {
 	return slog.GroupValue(
-		slog.Time("oldest", r.oldest),
-		slog.Time("newest", r.newest),
+		slog.Time("lower", r.lower),
+		slog.Time("upper", r.upper),
 	)
 }
 
