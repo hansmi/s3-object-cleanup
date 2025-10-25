@@ -68,7 +68,7 @@ func (o *versionSeriesFinalizeOptions) extendFromNow(ov objectVersion) (retentio
 func (o *versionSeriesFinalizeOptions) extend(ov objectVersion, until time.Time) (retentionExtenderRequest, bool) {
 	req := retentionExtenderRequest{
 		object: ov,
-		until:  until.Truncate(time.Second),
+		until:  until,
 	}
 
 	return req, (ov.retainUntil.IsZero() || ov.retainUntil.Before(req.until)) && !ov.deleteMarker
