@@ -3,7 +3,7 @@ module github.com/hansmi/s3-object-cleanup
 go 1.24.0
 
 require (
-	github.com/aws/aws-sdk-go-v2 v1.39.3
+	github.com/aws/aws-sdk-go-v2 v1.39.4
 	github.com/aws/aws-sdk-go-v2/config v1.31.13
 	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.19.13
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.88.5
@@ -14,6 +14,7 @@ require (
 	github.com/timshannon/bolthold v0.0.0-20240314194003-30aac6950928
 	go.etcd.io/bbolt v1.4.3
 	golang.org/x/sync v0.17.0
+	gonum.org/v1/gonum v0.16.0
 )
 
 require (
@@ -32,5 +33,4 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.35.2 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sts v1.38.7 // indirect
 	golang.org/x/sys v0.29.0 // indirect
-	gonum.org/v1/gonum v0.16.0 // indirect
 )
