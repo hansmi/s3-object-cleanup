@@ -8,6 +8,7 @@ import (
 	"log"
 	"log/slog"
 	"os"
+	"runtime"
 	"strings"
 	"time"
 
@@ -155,6 +156,9 @@ func (p *program) run(ctx context.Context, bucketNames []string) (err error) {
 
 			bucketErrors = append(bucketErrors, fmt.Errorf("%s: %w", c.Name(), err))
 		}
+
+		// There may be plenty of unreferenced allocations.
+		runtime.GC()
 	}
 
 	if persistState != nil {
