@@ -85,7 +85,7 @@ func (e *retentionExtender) process(ctx context.Context, req retentionExtenderRe
 			remainingOriginal = req.object.retainUntil.Sub(e.now).Truncate(time.Second).String()
 		}
 
-		e.logger.InfoContext(ctx, "Extending object retention",
+		e.logger.InfoContext(ctx, "Retain",
 			slog.Any("object", req.object),
 			slog.Group("remaining",
 				slog.String("original", remainingOriginal),
