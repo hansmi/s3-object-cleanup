@@ -15,6 +15,10 @@ type timeRange struct {
 var _ slog.LogValuer = (*timeRange)(nil)
 
 func (r *timeRange) update(t time.Time) {
+	if t.IsZero() {
+		return
+	}
+
 	if r.lower.IsZero() || t.Before(r.lower) {
 		r.lower = t
 	}
@@ -93,11 +97,7 @@ func (s *cleanupStats) addRetention(v objectVersion) {
 	s.mu.Lock()
 	s.retentionSuccessCount++
 	s.retentionModTime.update(v.lastModified)
-
-	if !v.retainUntil.IsZero() {
-		s.retentionOriginal.update(v.retainUntil)
-	}
-
+	s.retentionOriginal.update(v.retainUntil)
 	s.mu.Unlock()
 }
 
@@ -112,11 +112,7 @@ func (s *cleanupStats) addDelete(v objectVersion) {
 	s.deleteCount++
 	s.deleteSize.add(v.size)
 	s.deleteModTime.update(v.lastModified)
-
-	if !v.retainUntil.IsZero() {
-		s.deleteRetainUntil.update(v.retainUntil)
-	}
-
+	s.deleteRetainUntil.update(v.retainUntil)
 	s.mu.Unlock()
 }
 

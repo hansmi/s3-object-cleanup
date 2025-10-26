@@ -19,6 +19,10 @@ func TestTimeRange(t *testing.T) {
 	}{
 		{name: "empty"},
 		{
+			name:   "zeroes",
+			values: []time.Time{{}, {}, {}},
+		},
+		{
 			name: "one",
 			values: []time.Time{
 				time.Date(2020, time.December, 1, 2, 3, 4, 0, time.UTC),
