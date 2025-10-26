@@ -1,11 +1,12 @@
 package state
 
 import (
-	"compress/gzip"
 	"errors"
 	"fmt"
 	"io"
 	"os"
+
+	"github.com/klauspost/compress/gzip"
 )
 
 func CreateUnlinkedTemp(dir, pattern string) (*os.File, error) {
