@@ -67,6 +67,15 @@ func TestRetentionProcess(t *testing.T) {
 			},
 		},
 		{
+			name: "requested retention before actual",
+			req: retentionExtenderRequest{
+				object: objectVersion{
+					retainUntil: time.Date(2014, time.January, 20, 0, 0, 0, 0, time.UTC),
+				},
+				until: time.Date(2014, time.January, 10, 0, 0, 0, 0, time.UTC),
+			},
+		},
+		{
 			name: "not yet time for extension",
 			req: retentionExtenderRequest{
 				object: objectVersion{

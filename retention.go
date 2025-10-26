@@ -77,35 +77,42 @@ func (e *retentionExtender) process(ctx context.Context, req retentionExtenderRe
 	}
 
 	remaining := req.until.Sub(e.now).Truncate(time.Second)
+	remainingOriginal := ""
 
-	if req.object.retainUntil.IsZero() || remaining < e.minRemaining {
-		remainingOriginal := ""
-
-		if !req.object.retainUntil.IsZero() {
-			remainingOriginal = req.object.retainUntil.Sub(e.now).Truncate(time.Second).String()
+	if !req.object.retainUntil.IsZero() {
+		if req.until.Before(req.object.retainUntil) {
+			// Avoid shortening retention period.
+			return nil
 		}
 
-		e.logger.InfoContext(ctx, "Retain",
-			slog.Any("object", req.object),
-			slog.Group("remaining",
-				slog.String("original", remainingOriginal),
-				slog.String("change", remaining.String()),
-			),
-			slog.Time("until", req.until),
-		)
+		if remaining > e.minRemaining {
+			// Enough retention left.
+			return nil
+		}
 
-		e.stats.addRetention(req.object)
+		remainingOriginal = req.object.retainUntil.Sub(e.now).Truncate(time.Second).String()
+	}
 
-		if !e.dryRun {
-			ov := req.object
+	e.logger.InfoContext(ctx, "Retain",
+		slog.Any("object", req.object),
+		slog.Group("remaining",
+			slog.String("original", remainingOriginal),
+			slog.String("change", remaining.String()),
+		),
+		slog.Time("until", req.until),
+	)
 
-			if err := e.client.PutObjectRetention(ctx, ov.key, ov.versionID, req.until); err != nil {
-				return fmt.Errorf("setting object retention via API: %w", err)
-			}
+	e.stats.addRetention(req.object)
 
-			if err := e.state.SetObjectRetention(ov.key, ov.versionID, req.until); err != nil {
-				return fmt.Errorf("setting object retention in state: %w", err)
-			}
+	if !e.dryRun {
+		ov := req.object
+
+		if err := e.client.PutObjectRetention(ctx, ov.key, ov.versionID, req.until); err != nil {
+			return fmt.Errorf("setting object retention via API: %w", err)
+		}
+
+		if err := e.state.SetObjectRetention(ov.key, ov.versionID, req.until); err != nil {
+			return fmt.Errorf("setting object retention in state: %w", err)
 		}
 	}
 
