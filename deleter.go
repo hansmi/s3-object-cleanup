@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -12,6 +13,10 @@ import (
 
 const batchSize = 250
 
+type batchDeleterState interface {
+	DeleteObjectRetention(string, string) error
+}
+
 type batchDeleterClient interface {
 	DeleteObjects(context.Context, *s3.DeleteObjectsInput, ...func(*s3.Options)) (*s3.DeleteObjectsOutput, error)
 }
@@ -21,6 +26,7 @@ type batchDeleterCheckFunc func(objectVersion) bool
 type batchDeleterOptions struct {
 	logger *slog.Logger
 	stats  *cleanupStats
+	state  batchDeleterState
 	client batchDeleterClient
 	bucket string
 	dryRun bool
@@ -29,6 +35,7 @@ type batchDeleterOptions struct {
 type batchDeleter struct {
 	logger  *slog.Logger
 	stats   *cleanupStats
+	state   batchDeleterState
 	dryRun  bool
 	client  batchDeleterClient
 	bucket  string
@@ -39,6 +46,7 @@ func newBatchDeleter(opts batchDeleterOptions) *batchDeleter {
 	return &batchDeleter{
 		logger:  opts.logger,
 		stats:   opts.stats,
+		state:   opts.state,
 		dryRun:  opts.dryRun,
 		client:  opts.client,
 		bucket:  opts.bucket,
@@ -70,6 +78,12 @@ func (d *batchDeleter) deleteBatch(ctx context.Context, items []objectVersion) e
 		}
 
 		d.stats.addDeleteResults(len(output.Deleted), len(output.Errors))
+
+		for _, i := range output.Deleted {
+			if err := d.state.DeleteObjectRetention(aws.ToString(i.Key), aws.ToString(i.VersionId)); err != nil {
+				return fmt.Errorf("deleting object retention from state: %w", err)
+			}
+		}
 
 		for _, i := range output.Errors {
 			d.logger.ErrorContext(ctx, "Delete failed",

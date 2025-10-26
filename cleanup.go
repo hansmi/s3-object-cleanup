@@ -276,6 +276,7 @@ func cleanup(ctx context.Context, opts cleanupOptions) error {
 		deleter := newBatchDeleter(batchDeleterOptions{
 			logger: opts.logger,
 			stats:  opts.stats,
+			state:  bucketState,
 			client: opts.client.S3(),
 			bucket: opts.client.Name(),
 			dryRun: opts.dryRun,
