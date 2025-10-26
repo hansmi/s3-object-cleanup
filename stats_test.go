@@ -71,9 +71,10 @@ func TestStats(t *testing.T) {
 	// Missing attributes are detected via the use of pointers.
 	type structure struct {
 		Total *struct {
-			Count   *int64              `json:"count"`
-			Size    *sizeStatsStructure `json:"size"`
-			ModTime *timeRangeStructure `json:"mod_time"`
+			Count       *int64              `json:"count"`
+			Size        *sizeStatsStructure `json:"size"`
+			ModTime     *timeRangeStructure `json:"mod_time"`
+			RetainUntil *timeRangeStructure `json:"retain_until"`
 		} `json:"total"`
 		RetentionAnnotation *struct {
 			ErrorCount *int64 `json:"error_count"`
@@ -90,6 +91,7 @@ func TestStats(t *testing.T) {
 			SuccessCount *int64              `json:"success_count"`
 			ErrorCount   *int64              `json:"error_count"`
 			ModTime      *timeRangeStructure `json:"mod_time"`
+			RetainUntil  *timeRangeStructure `json:"retain_until"`
 		} `json:"delete"`
 	}
 
@@ -108,6 +110,10 @@ func TestStats(t *testing.T) {
 						"text": "0 B"
 					},
 					"mod_time": {
+						"lower": "0001-01-01T00:00:00Z",
+						"upper": "0001-01-01T00:00:00Z"
+					},
+					"retain_until": {
 						"lower": "0001-01-01T00:00:00Z",
 						"upper": "0001-01-01T00:00:00Z"
 					}
@@ -138,6 +144,10 @@ func TestStats(t *testing.T) {
 					"mod_time": {
 						"lower": "0001-01-01T00:00:00Z",
 						"upper": "0001-01-01T00:00:00Z"
+					},
+					"retain_until": {
+						"lower": "0001-01-01T00:00:00Z",
+						"upper": "0001-01-01T00:00:00Z"
 					}
 				}
 			}`,
@@ -162,6 +172,7 @@ func TestStats(t *testing.T) {
 				s.addDelete(objectVersion{
 					size:         3 * 1024 * 1024,
 					lastModified: time.Date(2021, time.March, 1, 0, 0, 0, 0, time.UTC),
+					retainUntil:  time.Date(2023, time.February, 1, 0, 0, 0, 0, time.UTC),
 				})
 				s.addDeleteResults(10, 20)
 			},
@@ -175,6 +186,10 @@ func TestStats(t *testing.T) {
 					"mod_time": {
 						"lower": "2011-10-01T00:00:00Z",
 						"upper": "2015-01-01T00:00:00Z"
+					},
+					"retain_until": {
+						"lower": "2018-01-01T00:00:00Z",
+						"upper": "2019-01-01T00:00:00Z"
 					}
 				},
 				"retention_annotation": {
@@ -203,6 +218,10 @@ func TestStats(t *testing.T) {
 					"mod_time": {
 						"lower": "2021-03-01T00:00:00Z",
 						"upper": "2021-03-01T00:00:00Z"
+					},
+					"retain_until": {
+						"lower": "2023-02-01T00:00:00Z",
+						"upper": "2023-02-01T00:00:00Z"
 					}
 				}
 			}`,

@@ -61,9 +61,10 @@ type cleanupStats struct {
 	retentionModTime      timeRange
 	retentionOriginal     timeRange
 
-	deleteCount   int64
-	deleteSize    sizeStats
-	deleteModTime timeRange
+	deleteCount       int64
+	deleteSize        sizeStats
+	deleteModTime     timeRange
+	deleteRetainUntil timeRange
 
 	deleteSuccessCount int64
 	deleteErrorCount   int64
@@ -111,6 +112,11 @@ func (s *cleanupStats) addDelete(v objectVersion) {
 	s.deleteCount++
 	s.deleteSize.add(v.size)
 	s.deleteModTime.update(v.lastModified)
+
+	if !v.retainUntil.IsZero() {
+		s.deleteRetainUntil.update(v.retainUntil)
+	}
+
 	s.mu.Unlock()
 }
 
@@ -149,6 +155,7 @@ func (s *cleanupStats) attrs() []any {
 			slog.Int64("count", s.deleteCount),
 			slog.Any("size", s.deleteSize),
 			slog.Any("mod_time", s.deleteModTime),
+			slog.Any("retain_until", s.deleteRetainUntil),
 			slog.Int64("success_count", s.deleteSuccessCount),
 			slog.Int64("error_count", s.deleteErrorCount),
 		),
