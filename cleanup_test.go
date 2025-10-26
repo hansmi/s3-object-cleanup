@@ -348,6 +348,25 @@ func TestVersionSeriesFinalize(t *testing.T) {
 			},
 		},
 		{
+			name: "retention before delete marker not yet expired",
+			items: []objectVersion{
+				{
+					lastModified: time.Date(2004, time.January, 1, 0, 0, 0, 0, time.UTC),
+					versionID:    "jan-1",
+					retainUntil:  time.Date(2004, time.April, 1, 0, 0, 0, 0, time.UTC),
+				},
+				{
+					lastModified: time.Date(2004, time.February, 1, 0, 0, 0, 0, time.UTC),
+					versionID:    "feb-1-del",
+					deleteMarker: true,
+					isLatest:     true,
+				},
+			},
+			now:            time.Date(2004, time.March, 28, 0, 0, 0, 0, time.UTC),
+			minRetention:   3 * 24 * time.Hour,
+			minDeletionAge: 4 * 24 * time.Hour,
+		},
+		{
 			name: "version after delete marker",
 			items: []objectVersion{
 				{
