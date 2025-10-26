@@ -27,6 +27,8 @@ const defaultMinRetentionThresholdDays = defaultMinRetentionDays / 4
 type program struct {
 	dryRun bool
 
+	timeout time.Duration
+
 	minDeletionAge        time.Duration
 	minRetention          time.Duration
 	minRetentionThreshold time.Duration
@@ -38,6 +40,10 @@ func (p *program) registerFlags() {
 	flag.BoolVar(&p.dryRun, "dry_run",
 		env.MustGetBool("S3_OBJECT_CLEANUP_DRY_RUN", true),
 		"Perform a trial run without actually deleting objects. Defaults to $S3_OBJECT_CLEANUP_DRY_RUN.")
+
+	flag.DurationVar(&p.timeout, "timeout",
+		env.MustGetDuration("S3_OBJECT_CLEANUP_TIMEOUT", 0),
+		"Maximum amount of time before giving up. Defaults to $S3_OBJECT_CLEANUP_TIMEOUT.")
 
 	flag.DurationVar(&p.minDeletionAge, "min_age",
 		env.MustGetDuration("S3_OBJECT_CLEANUP_MIN_AGE", minDeletionAgeDaysDefault*24*time.Hour),
@@ -137,12 +143,22 @@ func (p *program) run(ctx context.Context, bucketNames []string) (err error) {
 		slog.InfoContext(ctx, "Statistics", attrs...)
 	}()
 
+	cleanupCtx := ctx
+
+	if p.timeout > 0 {
+		var cancel context.CancelFunc
+
+		cleanupCtx, cancel = context.WithTimeout(ctx, p.timeout)
+
+		defer cancel()
+	}
+
 	var bucketErrors []error
 
 	for _, c := range clients {
 		logger := slog.With(slog.String("bucket", c.Name()))
 
-		if err := cleanup(ctx, cleanupOptions{
+		if err := cleanup(cleanupCtx, cleanupOptions{
 			logger:                logger,
 			stats:                 stats,
 			state:                 s,
