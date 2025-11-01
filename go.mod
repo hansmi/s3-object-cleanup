@@ -3,7 +3,7 @@ module github.com/hansmi/s3-object-cleanup
 go 1.24.0
 
 require (
-	github.com/aws/aws-sdk-go-v2 v1.39.4
+	github.com/aws/aws-sdk-go-v2 v1.39.5
 	github.com/aws/aws-sdk-go-v2/config v1.31.15
 	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.19.15
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.88.7
@@ -11,6 +11,7 @@ require (
 	github.com/deckarep/golang-set/v2 v2.8.0
 	github.com/dustin/go-humanize v1.0.1
 	github.com/google/go-cmp v0.7.0
+	github.com/klauspost/compress v1.18.1
 	github.com/timshannon/bolthold v0.0.0-20240314194003-30aac6950928
 	go.etcd.io/bbolt v1.4.3
 	golang.org/x/sync v0.17.0
@@ -32,6 +33,5 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sso v1.29.8 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.35.3 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sts v1.38.9 // indirect
-	github.com/klauspost/compress v1.18.1 // indirect
 	golang.org/x/sys v0.29.0 // indirect
 )
