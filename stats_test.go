@@ -75,19 +75,23 @@ func TestStats(t *testing.T) {
 	// Missing attributes are detected via the use of pointers.
 	type structure struct {
 		Total *struct {
-			Count       *int64              `json:"count"`
-			Size        *sizeStatsStructure `json:"size"`
-			ModTime     *timeRangeStructure `json:"mod_time"`
-			RetainUntil *timeRangeStructure `json:"retain_until"`
+			Count             *int64              `json:"count"`
+			Size              *sizeStatsStructure `json:"size"`
+			ModTime           *timeRangeStructure `json:"mod_time"`
+			RetainUntil       *timeRangeStructure `json:"retain_until"`
+			LatestModTime     *timeRangeStructure `json:"latest_mod_time"`
+			LatestRetainUntil *timeRangeStructure `json:"latest_retain_until"`
 		} `json:"total"`
 		RetentionAnnotation *struct {
 			ErrorCount *int64 `json:"error_count"`
 		} `json:"retention_annotation"`
 		Retention *struct {
-			SuccessCount *int64              `json:"success_count"`
-			ErrorCount   *int64              `json:"error_count"`
-			ModTime      *timeRangeStructure `json:"mod_time"`
-			Original     *timeRangeStructure `json:"original"`
+			SuccessCount   *int64              `json:"success_count"`
+			ErrorCount     *int64              `json:"error_count"`
+			ModTime        *timeRangeStructure `json:"mod_time"`
+			Original       *timeRangeStructure `json:"original"`
+			LatestModTime  *timeRangeStructure `json:"latest_mod_time"`
+			LatestOriginal *timeRangeStructure `json:"latest_original"`
 		} `json:"retention"`
 		Delete *struct {
 			Count        *int64              `json:"count"`
@@ -120,6 +124,14 @@ func TestStats(t *testing.T) {
 					"retain_until": {
 						"lower": "0001-01-01T00:00:00Z",
 						"upper": "0001-01-01T00:00:00Z"
+					},
+					"latest_mod_time": {
+						"lower": "0001-01-01T00:00:00Z",
+						"upper": "0001-01-01T00:00:00Z"
+					},
+					"latest_retain_until": {
+						"lower": "0001-01-01T00:00:00Z",
+						"upper": "0001-01-01T00:00:00Z"
 					}
 				},
 				"retention_annotation": {
@@ -133,6 +145,14 @@ func TestStats(t *testing.T) {
 						"upper": "0001-01-01T00:00:00Z"
 					},
 					"original": {
+						"lower": "0001-01-01T00:00:00Z",
+						"upper": "0001-01-01T00:00:00Z"
+					},
+					"latest_mod_time": {
+						"lower": "0001-01-01T00:00:00Z",
+						"upper": "0001-01-01T00:00:00Z"
+					},
+					"latest_original": {
 						"lower": "0001-01-01T00:00:00Z",
 						"upper": "0001-01-01T00:00:00Z"
 					}
@@ -169,9 +189,19 @@ func TestStats(t *testing.T) {
 					lastModified: time.Date(2011, time.October, 1, 0, 0, 0, 0, time.UTC),
 					retainUntil:  time.Date(2019, time.January, 1, 0, 0, 0, 0, time.UTC),
 				})
+				s.discovered(objectVersion{
+					isLatest:     true,
+					lastModified: time.Date(2013, time.January, 1, 0, 0, 0, 0, time.UTC),
+					retainUntil:  time.Date(2018, time.January, 1, 0, 0, 0, 0, time.UTC),
+				})
 				s.addRetention(objectVersion{
 					lastModified: time.Date(2012, time.October, 1, 0, 0, 0, 0, time.UTC),
 					retainUntil:  time.Date(2019, time.January, 1, 0, 0, 0, 0, time.UTC),
+				})
+				s.addRetention(objectVersion{
+					isLatest:     true,
+					lastModified: time.Date(2014, time.April, 1, 0, 0, 0, 0, time.UTC),
+					retainUntil:  time.Date(2020, time.May, 1, 0, 0, 0, 0, time.UTC),
 				})
 				s.addDelete(objectVersion{
 					size:         3 * 1024 * 1024,
@@ -182,7 +212,7 @@ func TestStats(t *testing.T) {
 			},
 			want: `{
 				"total": {
-					"count": 2,
+					"count": 3,
 					"size": {
 						"bytes": 7340032,
 						"text": "7.0 MiB"
@@ -194,21 +224,37 @@ func TestStats(t *testing.T) {
 					"retain_until": {
 						"lower": "2018-01-01T00:00:00Z",
 						"upper": "2019-01-01T00:00:00Z"
+					},
+					"latest_mod_time": {
+						"lower": "2013-01-01T00:00:00Z",
+						"upper": "2013-01-01T00:00:00Z"
+					},
+					"latest_retain_until": {
+						"lower": "2018-01-01T00:00:00Z",
+						"upper": "2018-01-01T00:00:00Z"
 					}
 				},
 				"retention_annotation": {
 					"error_count": 0
 				},
 				"retention": {
-					"success_count": 1,
+					"success_count": 2,
 					"error_count": 0,
 					"mod_time": {
 						"lower": "2012-10-01T00:00:00Z",
-						"upper": "2012-10-01T00:00:00Z"
+						"upper": "2014-04-01T00:00:00Z"
 					},
 					"original": {
 						"lower": "2019-01-01T00:00:00Z",
-						"upper": "2019-01-01T00:00:00Z"
+						"upper": "2020-05-01T00:00:00Z"
+					},
+					"latest_mod_time": {
+						"lower": "2014-04-01T00:00:00Z",
+						"upper": "2014-04-01T00:00:00Z"
+					},
+					"latest_original": {
+						"lower": "2020-05-01T00:00:00Z",
+						"upper": "2020-05-01T00:00:00Z"
 					}
 				},
 				"delete": {

@@ -55,15 +55,19 @@ type cleanupStats struct {
 
 	retentionAnnotationErrorCount int64
 
-	totalCount       int64
-	totalSize        sizeStats
-	totalModTime     timeRange
-	totalRetainUntil timeRange
+	totalCount             int64
+	totalSize              sizeStats
+	totalModTime           timeRange
+	totalRetainUntil       timeRange
+	totalLatestModTime     timeRange
+	totalLatestRetainUntil timeRange
 
-	retentionSuccessCount int64
-	retentionErrorCount   int64
-	retentionModTime      timeRange
-	retentionOriginal     timeRange
+	retentionSuccessCount   int64
+	retentionErrorCount     int64
+	retentionModTime        timeRange
+	retentionOriginal       timeRange
+	retentionLatestModTime  timeRange
+	retentionLatestOriginal timeRange
 
 	deleteCount       int64
 	deleteSize        sizeStats
@@ -90,6 +94,10 @@ func (s *cleanupStats) discovered(v objectVersion) {
 	s.totalSize.add(v.size)
 	s.totalModTime.update(v.lastModified)
 	s.totalRetainUntil.update(v.retainUntil)
+	if v.isLatest {
+		s.totalLatestModTime.update(v.lastModified)
+		s.totalLatestRetainUntil.update(v.retainUntil)
+	}
 	s.mu.Unlock()
 }
 
@@ -98,6 +106,10 @@ func (s *cleanupStats) addRetention(v objectVersion) {
 	s.retentionSuccessCount++
 	s.retentionModTime.update(v.lastModified)
 	s.retentionOriginal.update(v.retainUntil)
+	if v.isLatest {
+		s.retentionLatestModTime.update(v.lastModified)
+		s.retentionLatestOriginal.update(v.retainUntil)
+	}
 	s.mu.Unlock()
 }
 
@@ -137,6 +149,8 @@ func (s *cleanupStats) attrs() []any {
 			slog.Any("size", s.totalSize),
 			slog.Any("mod_time", s.totalModTime),
 			slog.Any("retain_until", s.totalRetainUntil),
+			slog.Any("latest_mod_time", s.totalLatestModTime),
+			slog.Any("latest_retain_until", s.totalLatestRetainUntil),
 		),
 		slog.Group("retention_annotation",
 			slog.Int64("error_count", s.retentionAnnotationErrorCount),
@@ -146,6 +160,8 @@ func (s *cleanupStats) attrs() []any {
 			slog.Int64("error_count", s.retentionErrorCount),
 			slog.Any("mod_time", s.retentionModTime),
 			slog.Any("original", s.retentionOriginal),
+			slog.Any("latest_mod_time", s.retentionLatestModTime),
+			slog.Any("latest_original", s.retentionLatestOriginal),
 		),
 		slog.Group("delete",
 			slog.Int64("count", s.deleteCount),
