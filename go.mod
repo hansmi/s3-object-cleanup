@@ -8,7 +8,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.22.6
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.99.0
 	github.com/aws/smithy-go v1.25.1
-	github.com/deckarep/golang-set/v2 v2.8.0
+	github.com/deckarep/golang-set/v2 v2.9.0
 	github.com/dustin/go-humanize v1.0.1
 	github.com/google/go-cmp v0.7.0
 	github.com/klauspost/compress v1.18.4
@@ -34,5 +34,6 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sso v1.30.15 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.35.19 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sts v1.41.10 // indirect
+	go.mongodb.org/mongo-driver v1.17.4 // indirect
 	golang.org/x/sys v0.29.0 // indirect
 )
