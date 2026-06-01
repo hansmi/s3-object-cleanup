@@ -116,7 +116,6 @@ func TestReportGroup(t *testing.T) {
 	got := map[string]string{}
 
 	for tr := tar.NewReader(zr); ; {
-		fmt.Printf("###\n")
 		hdr, err := tr.Next()
 		if err == io.EOF {
 			break

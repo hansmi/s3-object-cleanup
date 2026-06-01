@@ -259,6 +259,7 @@ func cleanup(ctx context.Context, opts cleanupOptions) error {
 
 		p := newProcessor(processorOptions{
 			stats:          opts.stats,
+			report:         opts.report,
 			minRetention:   opts.minRetention,
 			minDeletionAge: opts.minDeletionAge,
 		})
