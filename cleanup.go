@@ -145,12 +145,14 @@ func (s *versionSeries) finalize(opts versionSeriesFinalizeOptions) (result vers
 
 type processor struct {
 	stats          *cleanupStats
+	report         *reportBuilder
 	minRetention   time.Duration
 	minDeletionAge time.Duration
 }
 
 type processorOptions struct {
 	stats          *cleanupStats
+	report         *reportBuilder
 	minDeletionAge time.Duration
 	minRetention   time.Duration
 }
@@ -158,6 +160,7 @@ type processorOptions struct {
 func newProcessor(opts processorOptions) *processor {
 	return &processor{
 		stats:          opts.stats,
+		report:         opts.report,
 		minDeletionAge: opts.minDeletionAge,
 		minRetention:   opts.minRetention,
 	}
@@ -168,6 +171,10 @@ func (p *processor) run(in <-chan objectVersion, retentionCh chan<- retentionExt
 
 	for ov := range in {
 		p.stats.discovered(ov)
+
+		if p.report != nil {
+			p.report.discovered(ov)
+		}
 
 		s := objects[ov.key]
 
@@ -189,6 +196,11 @@ func (p *processor) run(in <-chan objectVersion, retentionCh chan<- retentionExt
 	for _, s := range objects {
 		result := s.finalize(finalizeOpts)
 
+		if p.report != nil {
+			p.report.addExpired(result.expired)
+			p.report.addRetention(result.retention)
+		}
+
 		for _, i := range result.expired {
 			deleteCh <- i
 		}
@@ -203,6 +215,7 @@ type cleanupOptions struct {
 	logger *slog.Logger
 	stats  *cleanupStats
 	state  *state.Store
+	report *reportBuilder
 	client *client.Client
 	dryRun bool
 

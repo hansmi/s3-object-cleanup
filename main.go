@@ -104,24 +104,37 @@ func (p *program) run(ctx context.Context, bucketNames []string) (err error) {
 		err = errors.Join(err, os.RemoveAll(tmpdir))
 	}()
 
+	var reports *reportGroup
+
 	var s *state.Store
 	var persistState func(context.Context) error
+	var persistReports func(context.Context) error
 
 	if p.persistenceBucket != "" {
-		const key = "state.gz"
+		const keyState = "state.gz"
+		const keyReports = "reports.tar.gz"
 
 		c, err := client.NewFromName(cfg, p.persistenceBucket)
 		if err != nil {
 			return err
 		}
 
-		if s, err = downloadStateFromBucket(ctx, tmpdir, c, key); err != nil {
+		if s, err = downloadStateFromBucket(ctx, tmpdir, c, keyState); err != nil {
 			slog.Warn("Restoring state failed", slog.Any("error", err))
 			s = nil
 		}
 
 		persistState = func(ctx context.Context) error {
-			return uploadStateToBucket(ctx, s, tmpdir, c, key)
+			return uploadStateToBucket(ctx, s, tmpdir, c, keyState)
+		}
+
+		reports, err = newReportGroup(tmpdir)
+		if err != nil {
+			return fmt.Errorf("report group: %w", err)
+		}
+
+		persistReports = func(ctx context.Context) error {
+			return uploadReportsToBucket(ctx, reports, tmpdir, c, keyReports)
 		}
 	}
 
@@ -158,7 +171,7 @@ func (p *program) run(ctx context.Context, bucketNames []string) (err error) {
 	for _, c := range clients {
 		logger := slog.With(slog.String("bucket", c.Name()))
 
-		if err := cleanup(cleanupCtx, cleanupOptions{
+		opts := cleanupOptions{
 			logger:                logger,
 			stats:                 stats,
 			state:                 s,
@@ -167,10 +180,24 @@ func (p *program) run(ctx context.Context, bucketNames []string) (err error) {
 			minDeletionAge:        p.minDeletionAge,
 			minRetention:          p.minRetention,
 			minRetentionThreshold: p.minRetentionThreshold,
-		}); err != nil {
+		}
+
+		if reports != nil {
+			opts.report = newReportBuilder()
+		}
+
+		if err := cleanup(cleanupCtx, opts); err != nil {
 			logger.Error("Cleanup failed", slog.Any("error", err))
 
 			bucketErrors = append(bucketErrors, fmt.Errorf("%s: %w", c.Name(), err))
+		}
+
+		if reports != nil {
+			if err := reports.add(c.Name(), opts.report); err != nil {
+				bucketErrors = append(bucketErrors, fmt.Errorf("%s: %w", c.Name(), err))
+			}
+
+			opts.report = nil
 		}
 
 		// There may be plenty of unreferenced allocations.
@@ -180,6 +207,12 @@ func (p *program) run(ctx context.Context, bucketNames []string) (err error) {
 	if persistState != nil {
 		if err := persistState(ctx); err != nil {
 			bucketErrors = append(bucketErrors, fmt.Errorf("persisting state: %w", err))
+		}
+	}
+
+	if persistReports != nil {
+		if err := persistReports(ctx); err != nil {
+			bucketErrors = append(bucketErrors, fmt.Errorf("persisting reports: %w", err))
 		}
 	}
 
