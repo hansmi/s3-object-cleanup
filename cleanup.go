@@ -19,15 +19,8 @@ type versionSeriesResult struct {
 }
 
 type versionSeries struct {
-	key        string
 	items      []objectVersion
 	haveLatest bool
-}
-
-func newVersionSeries(key string) *versionSeries {
-	return &versionSeries{
-		key: key,
-	}
 }
 
 func (s *versionSeries) add(v objectVersion) {
@@ -179,7 +172,7 @@ func (p *processor) run(in <-chan objectVersion, retentionCh chan<- retentionExt
 		s := objects[ov.key]
 
 		if s == nil {
-			s = newVersionSeries(ov.key)
+			s = &versionSeries{}
 
 			objects[ov.key] = s
 		}

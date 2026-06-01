@@ -50,7 +50,7 @@ func TestVersionSeriesAdd(t *testing.T) {
 			}
 
 			for count := range len(selected) {
-				s := newVersionSeries(t.Name())
+				var s versionSeries
 
 				for _, ov := range selected[:count] {
 					s.add(ov)
@@ -410,7 +410,7 @@ func TestVersionSeriesFinalize(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			s := newVersionSeries(t.Name())
+			var s versionSeries
 
 			for _, i := range tc.items {
 				s.add(i)
