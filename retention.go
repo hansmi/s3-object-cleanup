@@ -76,10 +76,14 @@ func (e *retentionExtender) process(ctx context.Context, req retentionExtenderRe
 		return fmt.Errorf("%w: missing retention time", os.ErrInvalid)
 	}
 
-	remaining := req.until.Sub(e.now).Truncate(time.Second)
-	remainingOriginal := ""
+	logAttr := []any{
+		slog.Any("object", req.object),
+		slog.Time("until", req.until),
+	}
 
 	if !req.object.retainUntil.IsZero() {
+		remaining := req.object.retainUntil.Sub(e.now).Truncate(time.Second)
+
 		if req.until.Before(req.object.retainUntil) {
 			// Avoid shortening retention period.
 			return nil
@@ -90,17 +94,15 @@ func (e *retentionExtender) process(ctx context.Context, req retentionExtenderRe
 			return nil
 		}
 
-		remainingOriginal = req.object.retainUntil.Sub(e.now).Truncate(time.Second).String()
+		after := req.until.Sub(e.now).Truncate(time.Second)
+
+		logAttr = append(logAttr, slog.Group("remaining",
+			slog.String("original", remaining.String()),
+			slog.String("after", after.String()),
+		))
 	}
 
-	e.logger.InfoContext(ctx, "Retain",
-		slog.Any("object", req.object),
-		slog.Group("remaining",
-			slog.String("original", remainingOriginal),
-			slog.String("change", remaining.String()),
-		),
-		slog.Time("until", req.until),
-	)
+	e.logger.InfoContext(ctx, "Retain", logAttr...)
 
 	e.stats.addRetention(req.object)
 
