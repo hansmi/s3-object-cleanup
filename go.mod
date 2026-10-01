@@ -9,7 +9,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.109.1
 	github.com/aws/smithy-go v1.28.1
 	github.com/deckarep/golang-set/v2 v2.9.0
-	github.com/dustin/go-humanize v1.0.1
+	github.com/dustin/go-humanize v1.1.0
 	github.com/google/go-cmp v0.7.0
 	github.com/klauspost/compress v1.20.1
 	github.com/timshannon/bolthold v0.0.0-20240314194003-30aac6950928
