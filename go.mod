@@ -14,7 +14,7 @@ require (
 	github.com/klauspost/compress v1.20.1
 	github.com/timshannon/bolthold v0.0.0-20240314194003-30aac6950928
 	go.etcd.io/bbolt v1.5.0
-	golang.org/x/sync v0.23.0
+	golang.org/x/sync v0.24.0
 	gonum.org/v1/gonum v0.17.0
 )
 
